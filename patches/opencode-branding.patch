@@ -1,0 +1,423 @@
+diff --git a/packages/opencode/src/index.ts b/packages/opencode/src/index.ts
+index 67a64d5..8413160 100644
+--- a/packages/opencode/src/index.ts
++++ b/packages/opencode/src/index.ts
+@@ -29,6 +29,7 @@ import { WebCommand } from "./cli/cmd/web"
+ import { PrCommand } from "./cli/cmd/pr"
+ import { SessionCommand } from "./cli/cmd/session"
+ import { DbCommand } from "./cli/cmd/db"
++import { MemoryCommand } from "./cli/cmd/memory"
+ import { errorMessage } from "./util/error"
+ import { PluginCommand } from "./cli/cmd/plug"
+ import { Heap } from "./cli/heap"
+@@ -135,6 +136,7 @@ const cli = yargs(args)
+   .command(SessionCommand)
+   .command(PluginCommand)
+   .command(DbCommand)
++  .command(MemoryCommand)
+   .fail((msg, err) => {
+     if (
+       msg?.startsWith("Unknown argument") ||
+diff --git a/packages/opencode/src/session/prompt.ts b/packages/opencode/src/session/prompt.ts
+index 701c632..0e45190 100644
+--- a/packages/opencode/src/session/prompt.ts
++++ b/packages/opencode/src/session/prompt.ts
+@@ -15,6 +15,10 @@ import type { JSONSchema7 } from "@ai-sdk/provider"
+ import { SessionCompaction } from "./compaction"
+ import { SystemPrompt } from "./system"
+ import { Instruction } from "./instruction"
++import { frozenSnapshotSystem } from "./memory/snapshot"
++import { recallSystemEntry } from "./memory/recall"
++import { writeMemoryStatus } from "./memory/status"
++import { indexSessionMessages, sessionRecallEntry } from "./memory/sessionindex"
+ import { Plugin } from "../plugin"
+ import MAX_STEPS from "../session/prompt/max-steps.txt"
+ import { ToolRegistry } from "@/tool/registry"
+@@ -1417,6 +1421,23 @@ export const layer = Layer.effect(
+               MessageV2.toModelMessagesEffect(msgs, model),
+             ])
+             const system = [...env, ...instructions, ...(skills ? [skills] : [])]
++            if (process.env.ATHENA_IMMERSIVE_MODE === "1") {
++              const athenaCtx = yield* InstanceState.context
++              system.push(
++                frozenSnapshotSystem(athenaCtx.worktree, sessionID, {
++                  agent: process.env.ATHENA_RUNTIME_BRAND?.trim(),
++                }),
++              )
++              const athenaQuery = (msgs.findLast((m) => m.info.role === "user")?.parts ?? [])
++                .flatMap((part) => (part.type === "text" ? [part.text] : []))
++                .join("\n")
++              indexSessionMessages(athenaCtx.worktree, sessionID, msgs)
++              const athenaRecall = recallSystemEntry(athenaCtx.worktree, athenaQuery)
++              const athenaSessionRecall = sessionRecallEntry(athenaCtx.worktree, athenaQuery)
++              writeMemoryStatus(athenaCtx.worktree, athenaQuery)
++              if (athenaRecall) system.push(athenaRecall)
++              if (athenaSessionRecall) system.push(athenaSessionRecall)
++            }
+             const format = lastUser.format ?? { type: "text" as const }
+             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
+             const result = yield* handle.process({
+diff --git a/packages/opencode/src/temporary.ts b/packages/opencode/src/temporary.ts
+index e7abd0d..481436b 100644
+--- a/packages/opencode/src/temporary.ts
++++ b/packages/opencode/src/temporary.ts
+@@ -1,5 +1,6 @@
+ import yargs from "yargs"
+ import { TuiThreadCommand } from "./cli/cmd/tui"
++import { MemoryCommand } from "./cli/cmd/memory"
+ import { InstallationVersion } from "@opencode-ai/core/installation/version"
+ import { hideBin } from "yargs/helpers"
+ import { Log } from "./node"
+@@ -30,4 +31,5 @@ const cli = yargs(hideBin(process.argv))
+     type: "boolean",
+   })
+   .command(TuiThreadCommand)
++  .command(MemoryCommand)
+   .parse()
+diff --git a/packages/opencode/src/tool/registry.ts b/packages/opencode/src/tool/registry.ts
+index f2ab972..b40c3a4 100644
+--- a/packages/opencode/src/tool/registry.ts
++++ b/packages/opencode/src/tool/registry.ts
+@@ -13,6 +13,9 @@ import { WebFetchTool } from "./webfetch"
+ import { WriteTool } from "./write"
+ import { InvalidTool } from "./invalid"
+ import { SkillTool } from "./skill"
++import { MemoryWriteTool } from "./memory-write"
++import { MemoryReadTool } from "./memory-read"
++import { SessionRecallTool } from "./session-recall"
+ import * as Tool from "./tool"
+ import { Config } from "@/config/config"
+ import { type ToolContext as PluginToolContext, type ToolDefinition } from "@opencode-ai/plugin"
+@@ -131,6 +134,9 @@ export const layer: Layer.Layer<
+     const greptool = yield* GrepTool
+     const patchtool = yield* ApplyPatchTool
+     const skilltool = yield* SkillTool
++    const memoryWriteTool = yield* MemoryWriteTool
++    const memoryReadTool = yield* MemoryReadTool
++    const sessionRecallTool = yield* SessionRecallTool
+     const agent = yield* Agent.Service
+ 
+     const state = yield* InstanceState.make<State>(
+@@ -235,6 +241,9 @@ export const layer: Layer.Layer<
+           search: Tool.init(websearch),
+           skill: Tool.init(skilltool),
+           patch: Tool.init(patchtool),
++          memory_write: Tool.init(memoryWriteTool),
++          memory_read: Tool.init(memoryReadTool),
++          session_recall: Tool.init(sessionRecallTool),
+           question: Tool.init(question),
+           lsp: Tool.init(lsptool),
+           plan: Tool.init(plan),
+@@ -257,6 +266,9 @@ export const layer: Layer.Layer<
+             tool.search,
+             tool.skill,
+             tool.patch,
++            tool.memory_write,
++            tool.memory_read,
++            tool.session_recall,
+             ...(flags.experimentalLspTool ? [tool.lsp] : []),
+             ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
+           ],
+diff --git a/packages/tui/src/app.tsx b/packages/tui/src/app.tsx
+index ec1fe4d..078efed 100644
+--- a/packages/tui/src/app.tsx
++++ b/packages/tui/src/app.tsx
+@@ -4,6 +4,7 @@ import { Deferred, Effect } from "effect"
+ import { Global } from "@opencode-ai/core/global"
+ import { Flag } from "@opencode-ai/core/flag/flag"
+ import { InstallationVersion } from "@opencode-ai/core/installation/version"
++import { athenaRuntimeBrand, athenaTerminalPrefix } from "./branding"
+ import { ClipboardProvider, useClipboard } from "./context/clipboard"
+ import { EpilogueProvider } from "./context/epilogue"
+ import * as Selection from "./util/selection"
+@@ -420,24 +421,24 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
+     if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
+ 
+     if (route.data.type === "home") {
+-      renderer.setTerminalTitle("OpenCode")
++      renderer.setTerminalTitle(athenaRuntimeBrand)
+       return
+     }
+ 
+     if (route.data.type === "session") {
+       const session = sync.session.get(route.data.sessionID)
+       if (!session || isDefaultTitle(session.title)) {
+-        renderer.setTerminalTitle("OpenCode")
++        renderer.setTerminalTitle(athenaRuntimeBrand)
+         return
+       }
+ 
+       const title = session.title.length > 40 ? session.title.slice(0, 37) + "..." : session.title
+-      renderer.setTerminalTitle(`OC | ${title}`)
++      renderer.setTerminalTitle(`${athenaTerminalPrefix} | ${title}`)
+       return
+     }
+ 
+     if (route.data.type === "plugin") {
+-      renderer.setTerminalTitle(`OC | ${route.data.id}`)
++      renderer.setTerminalTitle(`${athenaTerminalPrefix} | ${route.data.id}`)
+     }
+   })
+ 
+diff --git a/packages/tui/src/attention.ts b/packages/tui/src/attention.ts
+index b309edc..4751cae 100644
+--- a/packages/tui/src/attention.ts
++++ b/packages/tui/src/attention.ts
+@@ -38,14 +38,14 @@ type TuiAttentionHost = TuiAttention & {
+   dispose(): void
+ }
+ 
+-const DEFAULT_TITLE = "opencode"
++const DEFAULT_TITLE = process.env.ATHENA_RUNTIME_BRAND?.trim() || "ATHENA CODE"
+ const DEFAULT_PACK_ID = "opencode.default"
+ const KV_SOUND_PACK = "attention_sound_pack"
+ const TITLE_LIMIT = 80
+ const MESSAGE_LIMIT = 240
+ const BUILTIN_PACK: RegisteredSoundPack = {
+   id: DEFAULT_PACK_ID,
+-  name: "OpenCode Default",
++  name: "Athena Default",
+   builtin: true,
+   sounds: {
+     default: defaultSoundPath,
+diff --git a/packages/tui/src/branding.ts b/packages/tui/src/branding.ts
+new file mode 100644
+index 0000000..632197e
+--- /dev/null
++++ b/packages/tui/src/branding.ts
+@@ -0,0 +1,11 @@
++export type AthenaRuntimeBrand = "ATHENA CODE" | "ATHENA CODEX" | "ATHENA CLAUDE"
++
++export const athenaRuntimeBrand = (process.env.ATHENA_RUNTIME_BRAND?.trim().toUpperCase()
++  || "ATHENA CODE") as AthenaRuntimeBrand
++
++export const athenaImmersive = process.env.ATHENA_IMMERSIVE_MODE === "1"
++
++export const athenaModeLabel = athenaImmersive ? "IMMERSIVE" : "CLEAN"
++
++export const athenaTerminalPrefix =
++  athenaRuntimeBrand === "ATHENA CODEX" ? "ACX" : athenaRuntimeBrand === "ATHENA CLAUDE" ? "ACL" : "AC"
+diff --git a/packages/tui/src/component/prompt/index.tsx b/packages/tui/src/component/prompt/index.tsx
+index 0a9f103..4613af9 100644
+--- a/packages/tui/src/component/prompt/index.tsx
++++ b/packages/tui/src/component/prompt/index.tsx
+@@ -15,6 +15,7 @@ import path from "path"
+ import { fileURLToPath } from "url"
+ import { useLocal } from "../../context/local"
+ import { Flag } from "@opencode-ai/core/flag/flag"
++import { athenaRuntimeBrand } from "../../branding"
+ import { tint, useTheme } from "../../context/theme"
+ import { EmptyBorder, SplitBorder } from "../../ui/border"
+ import { useTuiPaths, useTuiTerminalEnvironment } from "../../context/runtime"
+@@ -205,7 +206,7 @@ export function Prompt(props: PromptProps) {
+   const workspace = usePromptWorkspace(props.sessionID)
+   const move = usePromptMove({ projectID: project.project, sessionID: () => props.sessionID })
+   const [cursorVersion, setCursorVersion] = createSignal(0)
+-  const currentProviderLabel = createMemo(() => local.model.parsed().provider)
++  const currentProviderLabel = createMemo(() => athenaRuntimeBrand)
+   const hasRightContent = createMemo(() => Boolean(props.right))
+ 
+   function promptModelWarning() {
+diff --git a/packages/tui/src/context/theme.tsx b/packages/tui/src/context/theme.tsx
+index 909dd69..00474c3 100644
+--- a/packages/tui/src/context/theme.tsx
++++ b/packages/tui/src/context/theme.tsx
+@@ -93,7 +93,7 @@ const [store, setStore] = createStore<State>({
+   themes: allThemes(),
+   mode: "dark",
+   lock: undefined,
+-  active: "opencode",
++  active: "athena",
+   ready: false,
+ })
+ 
+@@ -118,8 +118,8 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
+         if (!lock && pick(kv.get("theme_mode")) !== undefined) kv.set("theme_mode", undefined)
+         draft.mode = mode
+         draft.lock = lock
+-        const active = config.theme ?? kv.get("theme", "opencode")
+-        draft.active = typeof active === "string" ? active : "opencode"
++        const active = config.theme ?? kv.get("theme", "athena")
++        draft.active = typeof active === "string" ? active : "athena"
+         draft.ready = false
+       }),
+     )
+@@ -140,7 +140,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
+             }, {}),
+           )
+         })
+-        .catch(() => setStore("active", "opencode"))
++        .catch(() => setStore("active", "athena"))
+     }
+ 
+     onMount(() => {
+@@ -263,7 +263,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
+         if (theme) return resolveTheme(theme, store.mode)
+       }
+ 
+-      return resolveTheme(store.themes.opencode, store.mode)
++      return resolveTheme(store.themes.athena ?? store.themes.opencode, store.mode)
+     })
+ 
+     createEffect(() => renderer.setBackgroundColor(values().background))
+diff --git a/packages/tui/src/feature-plugins/home/footer.tsx b/packages/tui/src/feature-plugins/home/footer.tsx
+index 41bee5d..04f3a7a 100644
+--- a/packages/tui/src/feature-plugins/home/footer.tsx
++++ b/packages/tui/src/feature-plugins/home/footer.tsx
+@@ -1,9 +1,12 @@
+ import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
+ import type { BuiltinTuiPlugin } from "../builtins"
+-import { createMemo, Match, Show, Switch } from "solid-js"
++import { existsSync, readFileSync } from "node:fs"
++import { join } from "node:path"
++import { createMemo, createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js"
+ import { abbreviateHome } from "../../runtime"
+ import { useTuiPaths } from "../../context/runtime"
+ import { useHomeSessionDestination } from "../../routes/home/session-destination"
++import { athenaImmersive, athenaModeLabel, athenaRuntimeBrand } from "../../branding"
+ 
+ const id = "internal:home-footer"
+ 
+@@ -61,6 +64,46 @@ function Version(props: { api: TuiPluginApi }) {
+   )
+ }
+ 
++type MemoryStatus = {
++  loaded?: number
++  recalled?: number
++  empty_store?: boolean
++}
++
++function readMemoryStatus(directory: string): MemoryStatus | null {
++  const file = join(directory, ".context-workspace", "memory", "status.json")
++  if (!existsSync(file)) return null
++  try {
++    return JSON.parse(readFileSync(file, "utf8")) as MemoryStatus
++  } catch {
++    return null
++  }
++}
++
++function formatMemoryStatus(status: MemoryStatus | null): string {
++  if (!status || status.empty_store) return "memory empty"
++  return `loaded ${status.loaded ?? 0} memories · recalled ${status.recalled ?? 0} this turn`
++}
++
++function AthenaMemory(props: { api: TuiPluginApi }) {
++  const paths = useTuiPaths()
++  const directory = createMemo(() => props.api.state.path.directory || paths.cwd)
++  const [label, setLabel] = createSignal(formatMemoryStatus(readMemoryStatus(directory())))
++
++  onMount(() => {
++    const refresh = () => setLabel(formatMemoryStatus(readMemoryStatus(directory())))
++    refresh()
++    const timer = setInterval(refresh, 1000)
++    onCleanup(() => clearInterval(timer))
++  })
++
++  return (
++    <Show when={athenaImmersive}>
++      <text fg={props.api.theme.current.textMuted}>{label()}</text>
++    </Show>
++  )
++}
++
+ function View(props: { api: TuiPluginApi }) {
+   return (
+     <box
+@@ -75,6 +118,10 @@ function View(props: { api: TuiPluginApi }) {
+     >
+       <Directory api={props.api} />
+       <Mcp api={props.api} />
++      <text fg={props.api.theme.current.primary}>
++        {athenaRuntimeBrand} · {athenaModeLabel}
++      </text>
++      <AthenaMemory api={props.api} />
+       <box flexGrow={1} />
+       <Version api={props.api} />
+     </box>
+diff --git a/packages/tui/src/logo.ts b/packages/tui/src/logo.ts
+index a58a8cf..6f40d30 100644
+--- a/packages/tui/src/logo.ts
++++ b/packages/tui/src/logo.ts
+@@ -1,6 +1,10 @@
++// Athena Code wordmark, rendered with half-block glyphs so it stays crisp
++// at the terminal's 2x vertical resolution and reuses the native shimmer
++// engine in component/logo.tsx. Split ATH | ENA for the two-tone effect:
++// the left half draws in textMuted, the right half in text.
+ export const logo = {
+-  left: ["                   ", "█▀▀█ █▀▀█ █▀▀█ █▀▀▄", "█__█ █__█ █^^^ █__█", "▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀~~▀"],
+-  right: ["             ▄     ", "█▀▀▀ █▀▀█ █▀▀█ █▀▀█", "█___ █__█ █__█ █^^^", "▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀"],
++  left: ["                 ", "▄▀▀▀▄ ▀▀█▀▀ █   █", "█▀▀▀█   █   █▀▀▀█", "▀   ▀   ▀   ▀   ▀"],
++  right: ["                 ", "█▀▀▀▀ █▄  █ ▄▀▀▀▄", "█▀▀▀  █ ▀▄█ █▀▀▀█", "▀▀▀▀▀ ▀   ▀ ▀   ▀"],
+ }
+ 
+ export const go = {
+diff --git a/packages/tui/src/routes/session/permission.tsx b/packages/tui/src/routes/session/permission.tsx
+index c787a84..7962e78 100644
+--- a/packages/tui/src/routes/session/permission.tsx
++++ b/packages/tui/src/routes/session/permission.tsx
+@@ -141,11 +141,11 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+           body={
+             <Switch>
+               <Match when={props.request.always.length === 1 && props.request.always[0] === "*"}>
+-                <TextBody title={"This will allow " + props.request.permission + " until OpenCode is restarted."} />
++                <TextBody title={"This will allow " + props.request.permission + " until Athena is restarted."} />
+               </Match>
+               <Match when={true}>
+                 <box paddingLeft={1} gap={1}>
+-                  <text fg={theme.textMuted}>This will allow the following patterns until OpenCode is restarted</text>
++                  <text fg={theme.textMuted}>This will allow the following patterns until Athena is restarted</text>
+                   <box>
+                     <For each={props.request.always}>
+                       {(pattern) => (
+@@ -485,7 +485,7 @@ function RejectPrompt(props: { onConfirm: (message: string) => void; onCancel: (
+           <text fg={theme.text}>Reject permission</text>
+         </box>
+         <box paddingLeft={1}>
+-          <text fg={theme.textMuted}>Tell OpenCode what to do differently</text>
++          <text fg={theme.textMuted}>Tell Athena what to do differently</text>
+         </box>
+       </box>
+       <box
+diff --git a/packages/tui/src/theme/index.ts b/packages/tui/src/theme/index.ts
+index e8a5f2c..eaaa790 100644
+--- a/packages/tui/src/theme/index.ts
++++ b/packages/tui/src/theme/index.ts
+@@ -1,4 +1,5 @@
+ import { SyntaxStyle, RGBA, type TerminalColors } from "@opentui/core"
++import athena from "./assets/athena.json" with { type: "json" }
+ import aura from "./assets/aura.json" with { type: "json" }
+ import ayu from "./assets/ayu.json" with { type: "json" }
+ import carbonfox from "./assets/carbonfox.json" with { type: "json" }
+@@ -128,6 +129,7 @@ export type ThemeJson = {
+ }
+ 
+ export const DEFAULT_THEMES: Record<string, ThemeJson> = {
++  athena,
+   aura,
+   ayu,
+   catppuccin,
+diff --git a/packages/tui/src/util/presentation.ts b/packages/tui/src/util/presentation.ts
+index cf432bf..aad5a4f 100644
+--- a/packages/tui/src/util/presentation.ts
++++ b/packages/tui/src/util/presentation.ts
+@@ -1,6 +1,7 @@
++// Athena Code wordmark (half-block ATHENA), kept in sync with ../logo.ts.
+ const logo = {
+-  left: ["                   ", "█▀▀█ █▀▀█ █▀▀█ █▀▀▄", "█__█ █__█ █^^^ █__█", "▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀~~▀"],
+-  right: ["             ▄     ", "█▀▀▀ █▀▀█ █▀▀█ █▀▀█", "█___ █__█ █__█ █^^^", "▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀"],
++  left: ["                 ", "▄▀▀▀▄ ▀▀█▀▀ █   █", "█▀▀▀█   █   █▀▀▀█", "▀   ▀   ▀   ▀   ▀"],
++  right: ["                 ", "█▀▀▀▀ █▄  █ ▄▀▀▀▄", "█▀▀▀  █ ▀▄█ █▀▀▀█", "▀▀▀▀▀ ▀   ▀ ▀   ▀"],
+ }
+ 
+ const reset = "\x1b[0m"
+@@ -32,7 +33,7 @@ export function sessionEpilogue(input: { title: string; sessionID?: string }) {
+     ...wordmark("  "),
+     "",
+     `  ${weak("Session")}${bold}${input.title}${reset}`,
+-    `  ${weak("Continue")}${bold}opencode -s ${input.sessionID}${reset}`,
++    `  ${weak("Continue")}${bold}athena-code -s ${input.sessionID}${reset}`,
+     "",
+   ].join("\n")
+ }

@@ -1,0 +1,14 @@
+# Build artifacts — reproducible via scripts/build.sh
+runtime-bin/
+
+# Local runtime / generated state
+.context-workspace/
+.claude/
+
+# Dependencies / build output
+node_modules/
+dist/
+
+# Logs / OS cruft
+*.log
+.DS_Store
