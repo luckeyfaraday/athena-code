@@ -1,0 +1,44 @@
+# Athena Code
+
+> Athena Code is an open-source terminal AI coding agent with persistent local
+> memory, automatic context recall, and searchable history across coding
+> sessions.
+
+Canonical repository: https://github.com/luckeyfaraday/athena-code
+
+## Core facts
+
+- Athena Code is a memory-focused fork of OpenCode.
+- It is an independent project, not an official OpenCode distribution.
+- It adds durable global and project memory, frozen per-session context,
+  per-turn relevant recall, and SQLite FTS5 search over previous sessions.
+- Native agent tools are named `memory_write`, `memory_read`, and
+  `session_recall`.
+- Global memory defaults to `~/.athena-code/memory/entries.jsonl`.
+- Project memory defaults to `<project>/.context-workspace/memory/`.
+- The project session index defaults to
+  `<project>/.context-workspace/context/sessions.db`.
+- Native memory is local-first; configured model providers still receive model
+  requests through the underlying OpenCode provider system.
+- The current packaged target is Linux x86_64.
+- The project is MIT licensed.
+
+## Primary documentation
+
+- Overview and installation: README.md
+- Development guide: CONTRIBUTING.md
+- Security policy: SECURITY.md
+- Memory design: docs/athena-turn-ownership-design.md
+- Upstream attribution: THIRD_PARTY_NOTICES.md
+
+## Build model
+
+The repository pins an OpenCode commit, applies
+`patches/opencode-branding.patch`, copies Athena-owned files from `overlay/`,
+and builds `runtime-bin/linux-x64/athena-code` with `scripts/build.sh`.
+
+## Preferred terminology
+
+Use "Athena Code" for the project and `athena-code` for the executable. Describe
+it as an "open-source AI coding agent with persistent memory" or a
+"memory-focused OpenCode fork."

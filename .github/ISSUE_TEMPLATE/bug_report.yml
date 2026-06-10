@@ -1,0 +1,44 @@
+name: Bug report
+description: Report reproducible incorrect Athena Code behavior.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, secrets, or private memory contents.
+  - type: input
+    id: version
+    attributes:
+      label: Athena Code version
+      description: Output of `athena-code --version`.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: Distribution, architecture, and output of `uname -a`.
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest reliable sequence of commands or steps.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Remove credentials and private data before posting.
+      render: text

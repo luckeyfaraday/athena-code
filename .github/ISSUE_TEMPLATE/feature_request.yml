@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a focused improvement to Athena Code.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem should Athena Code solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the user-visible behavior, not only an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What existing workflows or designs did you consider?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Memory and recall
+        - Session search
+        - Terminal UI
+        - Installation and releases
+        - Platform support
+        - Other
+    validations:
+      required: true

@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Athena Code
+        run: ./scripts/build.sh
+
+      - name: Package binary
+        run: |
+          mkdir -p dist
+          stage="$(mktemp -d)"
+          cp runtime-bin/linux-x64/athena-code "$stage/"
+          cp LICENSE THIRD_PARTY_NOTICES.md "$stage/"
+          tar -C "$stage" -czf dist/athena-code-linux-x64.tar.gz \
+            athena-code LICENSE THIRD_PARTY_NOTICES.md
+          cd dist
+          sha256sum athena-code-linux-x64.tar.gz > athena-code-linux-x64.tar.gz.sha256
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: athena-code-linux-x64
+          path: dist/*
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/athena-code-linux-x64.tar.gz \
+            dist/athena-code-linux-x64.tar.gz.sha256 \
+            --generate-notes \
+            --title "Athena Code $GITHUB_REF_NAME"
