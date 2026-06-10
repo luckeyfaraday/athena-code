@@ -10,10 +10,36 @@ permissions:
   contents: write
 
 jobs:
-  linux-x64:
-    runs-on: ubuntu-24.04
+  build:
+    name: Build ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+            archive: tar
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+            archive: tar
+          - target: darwin-arm64
+            runner: macos-15
+            archive: tar
+          - target: darwin-x64
+            runner: macos-15-intel
+            archive: tar
+          - target: windows-x64
+            runner: windows-2025
+            archive: zip
+          - target: windows-arm64
+            runner: windows-11-arm
+            archive: zip
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build Athena Code
         run: |
@@ -23,30 +49,65 @@ jobs:
           fi
           ATHENA_CODE_VERSION="$version" ./scripts/build.sh
 
-      - name: Package binary
+      - name: Verify binary
+        run: |
+          binary="runtime-bin/${{ matrix.target }}/athena-code"
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+            binary="${binary}.exe"
+          fi
+          "$binary" --version
+
+      - name: Package Unix archive
+        if: matrix.archive == 'tar'
         run: |
           mkdir -p dist
           stage="$(mktemp -d)"
-          cp runtime-bin/linux-x64/athena-code "$stage/"
+          cp "runtime-bin/${{ matrix.target }}/athena-code" "$stage/"
           cp LICENSE THIRD_PARTY_NOTICES.md "$stage/"
-          tar -C "$stage" -czf dist/athena-code-linux-x64.tar.gz \
-            athena-code LICENSE THIRD_PARTY_NOTICES.md
-          cd dist
-          sha256sum athena-code-linux-x64.tar.gz > athena-code-linux-x64.tar.gz.sha256
+          asset="athena-code-${{ matrix.target }}.tar.gz"
+          tar -C "$stage" -czf "dist/$asset" athena-code LICENSE THIRD_PARTY_NOTICES.md
+          if command -v sha256sum >/dev/null; then
+            (cd dist && sha256sum "$asset" > "$asset.sha256")
+          else
+            (cd dist && shasum -a 256 "$asset" > "$asset.sha256")
+          fi
 
-      - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+      - name: Package Windows archive
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist, stage | Out-Null
+          Copy-Item "runtime-bin/${{ matrix.target }}/athena-code.exe" stage/
+          Copy-Item LICENSE, THIRD_PARTY_NOTICES.md stage/
+          $asset = "athena-code-${{ matrix.target }}.zip"
+          Compress-Archive -Path stage/* -DestinationPath "dist/$asset"
+          $hash = (Get-FileHash "dist/$asset" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $asset" | Set-Content -NoNewline "dist/$asset.sha256"
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v7
         with:
-          name: athena-code-linux-x64
+          name: athena-code-${{ matrix.target }}
           path: dist/*
 
+  publish:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: athena-code-*
+          path: dist
+          merge-multiple: true
+
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            dist/athena-code-linux-x64.tar.gz \
-            dist/athena-code-linux-x64.tar.gz.sha256 \
+            dist/* \
+            --repo "$GITHUB_REPOSITORY" \
             --generate-notes \
             --title "Athena Code $GITHUB_REF_NAME"

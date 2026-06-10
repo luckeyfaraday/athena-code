@@ -5,16 +5,16 @@ automatic context recall, and searchable history across coding sessions.**
 
 [![CI](https://github.com/luckeyfaraday/athena-code/actions/workflows/ci.yml/badge.svg)](https://github.com/luckeyfaraday/athena-code/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform: Linux x86_64](https://img.shields.io/badge/platform-Linux%20x86__64-lightgrey.svg)](#platform-support)
+[![Platforms: Linux, macOS, Windows](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#platform-support)
 
 Athena Code is a memory-focused fork of
 [OpenCode](https://github.com/anomalyco/opencode). It gives an AI coding agent
 local, durable memory; freezes relevant context for a session; recalls related
 facts for each turn; and indexes prior conversations for later search.
 
-> **Project status:** early development. Linux x86_64 is the first supported
-> platform. The source, build system, tests, and release automation are public;
-> use a published GitHub release when one is available, or build from source.
+> **Project status:** early development. Native release builds are produced for
+> Linux, macOS, and Windows on x64 and ARM64. macOS and Windows binaries are not
+> yet code-signed.
 
 ## Why Athena Code?
 
@@ -38,9 +38,9 @@ local-first memory layer directly to the agent loop:
 
 ## Quick Start
 
-### Install a release
+### Linux and macOS
 
-When a release is available, install the latest Linux x86_64 build:
+Install the latest build for the current operating system and architecture:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/luckeyfaraday/athena-code/main/scripts/install.sh | bash
@@ -55,17 +55,29 @@ Install a specific version:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/luckeyfaraday/athena-code/main/scripts/install.sh |
-  bash -s -- --version v0.1.0
+  bash -s -- --version v0.2.0
 ```
 
 See [GitHub Releases](https://github.com/luckeyfaraday/athena-code/releases)
 for available versions, archives, checksums, and release notes.
 
+### Windows
+
+Run in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/luckeyfaraday/athena-code/main/scripts/install.ps1 | iex
+```
+
+The installer verifies the release checksum, installs
+`athena-code.exe` under `%LOCALAPPDATA%\AthenaCode`, and adds its `bin`
+directory to your user `PATH`.
+
 ### Build from source
 
 Requirements:
 
-- Linux x86_64
+- A supported Linux, macOS, or Windows host
 - Git
 - Node.js with `npx`
 - At least 5 GB of free temporary disk space
@@ -74,17 +86,22 @@ Requirements:
 git clone https://github.com/luckeyfaraday/athena-code.git
 cd athena-code
 ./scripts/build.sh
-./runtime-bin/linux-x64/athena-code
 ```
 
 The build checks out the pinned OpenCode revision, applies Athena Code's patch
 and source overlay, installs dependencies, and writes the executable to
-`runtime-bin/linux-x64/athena-code`.
+`runtime-bin/<platform>-<architecture>/`.
 
-To install your local build:
+Install a local Linux or macOS build by passing its generated path:
 
 ```bash
 ./scripts/install.sh --from-file ./runtime-bin/linux-x64/athena-code
+```
+
+On Windows:
+
+```powershell
+.\scripts\install.ps1 -FromFile .\runtime-bin\windows-x64\athena-code.exe
 ```
 
 ## Usage
@@ -156,7 +173,7 @@ patches/opencode-branding.patch
         +
 overlay/packages/opencode/...
         =
-runtime-bin/linux-x64/athena-code
+runtime-bin/<platform>-<architecture>/athena-code
 ```
 
 Key directories:
@@ -166,7 +183,8 @@ Key directories:
 | `overlay/` | Athena-owned memory, recall, tools, and TUI source |
 | `patches/` | Integration and branding changes applied to OpenCode |
 | `scripts/build.sh` | Reproducible source build |
-| `scripts/install.sh` | Release and local-build installer |
+| `scripts/install.sh` | Linux and macOS installer |
+| `scripts/install.ps1` | Windows PowerShell installer |
 | `test/` | Memory, recall, snapshot, and session-index tests |
 | `docs/` | Technical design documentation |
 
@@ -191,13 +209,20 @@ request expectations.
 
 | Platform | Status |
 |---|---|
-| Linux x86_64 | Supported build and release target |
-| Linux ARM64 | Not yet packaged |
-| macOS | Not yet supported |
-| Windows | Not yet supported |
+| Linux x64 | Native release build |
+| Linux ARM64 | Native release build |
+| macOS Apple Silicon | Native release build; unsigned |
+| macOS Intel | Native release build; unsigned |
+| Windows x64 | Native release build; unsigned |
+| Windows ARM64 | Native release build; unsigned |
 
 Platform support describes Athena Code packaging, not every platform supported
 by upstream OpenCode.
+
+Unsigned macOS builds may require confirmation in **System Settings > Privacy &
+Security** on first launch. Windows SmartScreen may also warn about an
+unrecognized publisher. Code signing and macOS notarization are planned release
+hardening work.
 
 ## FAQ
 

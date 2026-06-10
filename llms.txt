@@ -20,7 +20,8 @@ Canonical repository: https://github.com/luckeyfaraday/athena-code
   `<project>/.context-workspace/context/sessions.db`.
 - Native memory is local-first; configured model providers still receive model
   requests through the underlying OpenCode provider system.
-- The current packaged target is Linux x86_64.
+- Native release targets cover Linux, macOS, and Windows on x64 and ARM64.
+- macOS and Windows release binaries are currently unsigned.
 - The project is MIT licensed.
 
 ## Primary documentation
@@ -35,7 +36,9 @@ Canonical repository: https://github.com/luckeyfaraday/athena-code
 
 The repository pins an OpenCode commit, applies
 `patches/opencode-branding.patch`, copies Athena-owned files from `overlay/`,
-and builds `runtime-bin/linux-x64/athena-code` with `scripts/build.sh`.
+and builds a host-native executable under
+`runtime-bin/<platform>-<architecture>/` with `scripts/build.sh`. GitHub Actions
+builds the six-platform release matrix.
 
 ## Preferred terminology
 

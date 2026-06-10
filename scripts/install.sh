@@ -48,10 +48,22 @@ done
 
 platform="$(uname -s)"
 architecture="$(uname -m)"
-if [[ "$platform" != "Linux" || "$architecture" != "x86_64" ]]; then
-  echo "error: Athena Code currently supports Linux x86_64; found $platform $architecture" >&2
-  exit 1
-fi
+case "$platform" in
+  Linux) platform="linux" ;;
+  Darwin) platform="darwin" ;;
+  *)
+    echo "error: use install.ps1 on Windows; unsupported platform: $platform" >&2
+    exit 1
+    ;;
+esac
+case "$architecture" in
+  x86_64|amd64) architecture="x64" ;;
+  arm64|aarch64) architecture="arm64" ;;
+  *)
+    echo "error: unsupported architecture: $architecture" >&2
+    exit 1
+    ;;
+esac
 
 mkdir -p "$INSTALL_ROOT/bin" "$BIN_DIR"
 target="$INSTALL_ROOT/bin/athena-code"
@@ -62,7 +74,14 @@ if [[ -n "$SOURCE_FILE" ]]; then
 else
   command -v curl >/dev/null || { echo "error: curl is required" >&2; exit 1; }
   command -v tar >/dev/null || { echo "error: tar is required" >&2; exit 1; }
-  command -v sha256sum >/dev/null || { echo "error: sha256sum is required" >&2; exit 1; }
+  if command -v sha256sum >/dev/null; then
+    checksum() { sha256sum --check "$1"; }
+  elif command -v shasum >/dev/null; then
+    checksum() { shasum -a 256 --check "$1"; }
+  else
+    echo "error: sha256sum or shasum is required" >&2
+    exit 1
+  fi
 
   if [[ "$VERSION" == "latest" ]]; then
     release_path="latest/download"
@@ -70,7 +89,7 @@ else
     release_path="download/$VERSION"
   fi
 
-  asset="athena-code-linux-x64.tar.gz"
+  asset="athena-code-$platform-$architecture.tar.gz"
   base_url="https://github.com/$REPOSITORY/releases/$release_path"
   temp_dir="$(mktemp -d)"
   trap 'rm -rf "$temp_dir"' EXIT
@@ -80,7 +99,7 @@ else
   curl --fail --location --show-error --silent "$base_url/$asset.sha256" -o "$temp_dir/$asset.sha256"
   (
     cd "$temp_dir"
-    sha256sum --check "$asset.sha256"
+    checksum "$asset.sha256"
     tar -xzf "$asset"
   )
   install -m 0755 "$temp_dir/athena-code" "$target"

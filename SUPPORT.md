@@ -14,6 +14,6 @@ athena-code --version
 uname -a
 ```
 
-Athena Code currently supports Linux x86_64. Questions about unlisted
-platforms are welcome as feature requests, but those platforms are not yet
-supported release targets.
+Athena Code publishes native builds for Linux, macOS, and Windows on x64 and
+ARM64. Include the exact operating system and architecture in platform-specific
+reports. macOS and Windows releases are currently unsigned.

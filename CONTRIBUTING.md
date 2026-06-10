@@ -15,7 +15,7 @@ well-scoped memory or recall enhancements.
 
 Requirements:
 
-- Linux x86_64
+- A supported Linux, macOS, or Windows host
 - Git
 - Node.js with `npx`
 - At least 5 GB of free temporary disk space for a full build
@@ -33,6 +33,9 @@ Build the executable:
 ```bash
 ./scripts/build.sh
 ```
+
+The build detects the host operating system and architecture. GitHub Actions
+builds and smoke-tests the complete Linux, macOS, and Windows x64/ARM64 matrix.
 
 Local builds report version `0.0.0-dev`. Set `ATHENA_CODE_VERSION` when testing
 version-specific packaging:

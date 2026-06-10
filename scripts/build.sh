@@ -5,6 +5,41 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE="${ATHENA_OPENCODE_SOURCE:-/tmp/athena-opencode-source}"
 REVISION="1772e8ee6e794d1241dac6fa10d28e708f53b881"
 VERSION="${ATHENA_CODE_VERSION:-0.0.0-dev}"
+HOST_PLATFORM="$(node -p 'process.platform')"
+HOST_ARCH="$(node -p 'process.arch')"
+
+case "$HOST_PLATFORM" in
+  linux)
+    PLATFORM="linux"
+    EXECUTABLE="opencode"
+    OUTPUT_NAME="athena-code"
+    ;;
+  darwin)
+    PLATFORM="darwin"
+    EXECUTABLE="opencode"
+    OUTPUT_NAME="athena-code"
+    ;;
+  win32)
+    PLATFORM="windows"
+    EXECUTABLE="opencode.exe"
+    OUTPUT_NAME="athena-code.exe"
+    ;;
+  *)
+    echo "error: unsupported build platform: $HOST_PLATFORM" >&2
+    exit 1
+    ;;
+esac
+
+case "$HOST_ARCH" in
+  x64|arm64) ;;
+  *)
+    echo "error: unsupported build architecture: $HOST_ARCH" >&2
+    exit 1
+    ;;
+esac
+
+TARGET="$PLATFORM-$HOST_ARCH"
+UPSTREAM_TARGET="$PLATFORM-$HOST_ARCH"
 # This build clones a repo and installs node_modules (~3GB) under SOURCE, which
 # defaults to /tmp. Leaving it behind is a top contributor to /tmp filling up and
 # the resulting ENOSPC/SIGBUS crashes, so clean it on exit unless asked to keep it
@@ -29,11 +64,12 @@ cleanup() {
 trap cleanup EXIT
 
 if [[ ! -d "$SOURCE/.git" ]]; then
-  git clone https://github.com/anomalyco/opencode.git "$SOURCE"
+  git -c core.autocrlf=false clone --no-checkout https://github.com/anomalyco/opencode.git "$SOURCE"
 fi
 
+git -C "$SOURCE" config core.autocrlf false
 git -C "$SOURCE" fetch origin "$REVISION"
-git -C "$SOURCE" checkout --detach "$REVISION"
+git -C "$SOURCE" checkout --detach --force "$REVISION"
 git -C "$SOURCE" apply "$ROOT/patches/opencode-branding.patch"
 
 # Overlay Athena-owned native source (memory store + frozen snapshot) on top of
@@ -46,4 +82,6 @@ cp -R "$ROOT/overlay/." "$SOURCE/"
 cd "$SOURCE"
 npx --yes bun@1.3.14 install --frozen-lockfile
 OPENCODE_VERSION="$VERSION" npx --yes bun@1.3.14 run --cwd packages/opencode script/build.ts --single --skip-install --skip-embed-web-ui
-install -D packages/opencode/dist/opencode-linux-x64/bin/opencode "$ROOT/runtime-bin/linux-x64/athena-code"
+mkdir -p "$ROOT/runtime-bin/$TARGET"
+cp "packages/opencode/dist/opencode-$UPSTREAM_TARGET/bin/$EXECUTABLE" "$ROOT/runtime-bin/$TARGET/$OUTPUT_NAME"
+chmod +x "$ROOT/runtime-bin/$TARGET/$OUTPUT_NAME" 2>/dev/null || true
