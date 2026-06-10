@@ -14,7 +14,17 @@ function renderSessionRecall(params: { query: string }, workspace: string): {
   metadata: Record<string, unknown>
   output: string
 } {
-  const result = readSessionRecall(workspace, params.query)
+  let result: ReturnType<typeof readSessionRecall>
+  try {
+    result = readSessionRecall(workspace, params.query)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    return {
+      title: "Session recall unavailable",
+      metadata: { error: true, query: params.query.trim() },
+      output: `Athena Code could not read the session index: ${detail}`,
+    }
+  }
   if (result.empty_index) {
     return {
       title: "Session recall empty",
@@ -56,8 +66,7 @@ export const SessionRecallTool = Tool.define(
         Effect.gen(function* () {
           const instance = yield* InstanceState.context
           return renderSessionRecall(params, instance.worktree)
-        }).pipe(Effect.orDie),
+        }),
     }
   }),
 )
-

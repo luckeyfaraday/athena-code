@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test"
-import { mkdtempSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
@@ -103,4 +103,32 @@ test("readSessionRecall reports empty index and no-match states", () => {
   expect(found.empty_index).toBe(false)
   expect(found.hits.length).toBeGreaterThan(0)
   expect(found.hits[0].session_id).toBe("s2")
+})
+
+test("searching an uninitialized workspace does not create a session index", () => {
+  const ws = workspace("athftsreadonly-empty-")
+  expect(readSessionRecall(ws, "deploy").empty_index).toBe(true)
+  expect(existsSync(join(ws, ".context-workspace"))).toBe(false)
+})
+
+test("session recall can read an existing read-only index", () => {
+  const ws = workspace("athftsreadonly-")
+  indexMessages(ws, corpus)
+  const dbPath = join(ws, ".context-workspace", "context", "sessions.db")
+  chmodSync(dbPath, 0o444)
+  try {
+    const result = readSessionRecall(ws, "standup")
+    expect(result.hits.some((hit) => hit.session_id === "s2")).toBe(true)
+  } finally {
+    chmodSync(dbPath, 0o644)
+  }
+})
+
+test("last session returns the most recently indexed session", () => {
+  const ws = workspace("athftslatest-")
+  indexMessages(ws, corpus)
+  const result = readSessionRecall(ws, "last session")
+  expect(result.hits.length).toBeGreaterThan(0)
+  expect(result.hits.every((hit) => hit.session_id === "s2")).toBe(true)
+  expect(result.hits.some((hit) => hit.text.includes("standup"))).toBe(true)
 })

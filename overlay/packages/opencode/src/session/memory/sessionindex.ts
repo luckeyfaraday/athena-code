@@ -7,7 +7,7 @@
 // FTS5, no external service.
 
 import { Database } from "bun:sqlite"
-import { mkdirSync } from "node:fs"
+import { existsSync, mkdirSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { bounded } from "./store"
 import { tokenize } from "./recall"
@@ -16,10 +16,14 @@ const MAX_SESSION_RECALL_CHARS = 3_000
 const MAX_HIT_CHARS = 400
 const DEFAULT_LIMIT = 5
 
-function open(workspace: string): Database {
+function databasePath(workspace: string): string {
+  return join(resolve(workspace), ".context-workspace", "context", "sessions.db")
+}
+
+function openWritable(workspace: string): Database {
   const dir = join(resolve(workspace), ".context-workspace", "context")
   mkdirSync(dir, { recursive: true })
-  const db = new Database(join(dir, "sessions.db"))
+  const db = new Database(databasePath(workspace))
   db.run("PRAGMA journal_mode = WAL")
   db.run(
     `CREATE TABLE IF NOT EXISTS messages (
@@ -41,6 +45,12 @@ function open(workspace: string): Database {
      END`,
   )
   return db
+}
+
+function openReadonly(workspace: string): Database | null {
+  const path = databasePath(workspace)
+  if (!existsSync(path)) return null
+  return new Database(path, { readonly: true })
 }
 
 export interface SessionMessage {
@@ -75,7 +85,7 @@ export interface MessageLike {
 export function indexMessages(workspace: string, messages: SessionMessage[]): number {
   const rows = messages.filter((m) => m.text.trim())
   if (rows.length === 0) return 0
-  const db = open(workspace)
+  const db = openWritable(workspace)
   try {
     const count = () => (db.query("SELECT COUNT(*) AS c FROM messages").get() as { c: number }).c
     const before = count()
@@ -101,7 +111,8 @@ function matchExpression(query: string): string {
 export function searchSessions(workspace: string, query: string, limit = DEFAULT_LIMIT): SessionHit[] {
   const match = matchExpression(query)
   if (!match) return []
-  const db = open(workspace)
+  const db = openReadonly(workspace)
+  if (!db) return []
   try {
     return db
       .query(
@@ -116,6 +127,32 @@ export function searchSessions(workspace: string, query: string, limit = DEFAULT
   } finally {
     db.close()
   }
+}
+
+function latestSession(workspace: string, limit = DEFAULT_LIMIT): SessionHit[] {
+  const db = openReadonly(workspace)
+  if (!db) return []
+  try {
+    const latest = db
+      .query("SELECT session_id FROM messages ORDER BY id DESC LIMIT 1")
+      .get() as { session_id: string } | null
+    if (!latest) return []
+    return db
+      .query(
+        `SELECT session_id, role, ts, text, 0 AS score
+         FROM messages
+         WHERE session_id = ?
+         ORDER BY id ASC
+         LIMIT ?`,
+      )
+      .all(latest.session_id, limit) as SessionHit[]
+  } finally {
+    db.close()
+  }
+}
+
+function requestsLatestSession(query: string): boolean {
+  return /^(last|latest|most recent|previous)(\s+session)?$/i.test(query.trim())
 }
 
 export function indexSessionMessages(workspace: string, sessionId: string, messages: MessageLike[]): number {
@@ -144,12 +181,16 @@ export function readSessionRecall(
   limit = DEFAULT_LIMIT,
 ): { hits: SessionHit[]; query: string; empty_index: boolean } {
   const normalized = query.trim()
-  const db = open(workspace)
+  const db = openReadonly(workspace)
+  if (!db) return { hits: [], query: normalized, empty_index: true }
   try {
     const total = (db.query("SELECT COUNT(*) AS c FROM messages").get() as { c: number }).c
     if (total === 0) return { hits: [], query: normalized, empty_index: true }
   } finally {
     db.close()
+  }
+  if (requestsLatestSession(normalized)) {
+    return { hits: latestSession(workspace, limit), query: normalized, empty_index: false }
   }
   return { hits: searchSessions(workspace, normalized, limit), query: normalized, empty_index: false }
 }
