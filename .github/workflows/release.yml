@@ -79,6 +79,18 @@ jobs:
             -FromFile "runtime-bin/${{ matrix.target }}/athena-code.exe"
           & (Join-Path $binDir "athena-code.exe") --version
 
+      - name: Verify Windows installer (Windows PowerShell 5.1)
+        if: matrix.archive == 'zip'
+        shell: powershell
+        run: |
+          $installRoot = Join-Path $env:RUNNER_TEMP "athena-code-install-ps51"
+          $binDir = Join-Path $installRoot "bin"
+          ./scripts/install.ps1 `
+            -InstallRoot $installRoot `
+            -BinDir $binDir `
+            -FromFile "runtime-bin/${{ matrix.target }}/athena-code.exe"
+          & (Join-Path $binDir "athena-code.exe") --version
+
       - name: Package Unix archive
         if: matrix.archive == 'tar'
         run: |

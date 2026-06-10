@@ -8,11 +8,20 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Progress rendering slows Invoke-WebRequest downloads drastically on Windows PowerShell 5.1.
+$ProgressPreference = "SilentlyContinue"
 
-$architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
-switch ($architecture) {
-    "x64" { $targetArchitecture = "x64" }
-    "arm64" { $targetArchitecture = "arm64" }
+# Windows PowerShell 5.1 does not negotiate TLS 1.2 by default, which GitHub requires.
+if ($PSVersionTable.PSVersion.Major -lt 6) {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+}
+
+# PROCESSOR_ARCHITECTURE works on both Windows PowerShell 5.1 and PowerShell 7;
+# PROCESSOR_ARCHITEW6432 reports the real architecture under a 32-bit process.
+$architecture = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+switch ($architecture.ToUpperInvariant()) {
+    "AMD64" { $targetArchitecture = "x64" }
+    "ARM64" { $targetArchitecture = "arm64" }
     default { throw "Unsupported Windows architecture: $architecture" }
 }
 
