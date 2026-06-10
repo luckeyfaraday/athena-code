@@ -57,6 +57,28 @@ jobs:
           fi
           "$binary" --version
 
+      - name: Verify Unix installer
+        if: matrix.archive == 'tar'
+        run: |
+          install_root="$RUNNER_TEMP/athena-code-install"
+          ATHENA_CODE_INSTALL_ROOT="$install_root/share" \
+            ATHENA_CODE_BIN_DIR="$install_root/bin" \
+            ./scripts/install.sh \
+            --from-file "runtime-bin/${{ matrix.target }}/athena-code"
+          "$install_root/bin/athena-code" --version
+
+      - name: Verify Windows installer
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $installRoot = Join-Path $env:RUNNER_TEMP "athena-code-install"
+          $binDir = Join-Path $installRoot "bin"
+          ./scripts/install.ps1 `
+            -InstallRoot $installRoot `
+            -BinDir $binDir `
+            -FromFile "runtime-bin/${{ matrix.target }}/athena-code.exe"
+          & (Join-Path $binDir "athena-code.exe") --version
+
       - name: Package Unix archive
         if: matrix.archive == 'tar'
         run: |
