@@ -28,11 +28,12 @@ Canonical repository: https://github.com/luckeyfaraday/athena-code
 
 ## Primary documentation
 
-- Overview and installation: README.md
-- Development guide: CONTRIBUTING.md
-- Security policy: SECURITY.md
-- Memory design: docs/athena-turn-ownership-design.md
-- Upstream attribution: THIRD_PARTY_NOTICES.md
+- Overview and installation: https://github.com/luckeyfaraday/athena-code/blob/main/README.md
+- Development guide: https://github.com/luckeyfaraday/athena-code/blob/main/CONTRIBUTING.md
+- Security policy: https://github.com/luckeyfaraday/athena-code/blob/main/SECURITY.md
+- Memory design: https://github.com/luckeyfaraday/athena-code/blob/main/docs/athena-turn-ownership-design.md
+- Upstream attribution: https://github.com/luckeyfaraday/athena-code/blob/main/THIRD_PARTY_NOTICES.md
+- Releases and checksums: https://github.com/luckeyfaraday/athena-code/releases
 
 ## Build model
 

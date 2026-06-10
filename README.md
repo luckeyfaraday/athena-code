@@ -4,6 +4,7 @@
 automatic context recall, and searchable history across coding sessions.**
 
 [![CI](https://github.com/luckeyfaraday/athena-code/actions/workflows/ci.yml/badge.svg)](https://github.com/luckeyfaraday/athena-code/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/luckeyfaraday/athena-code)](https://github.com/luckeyfaraday/athena-code/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platforms: Linux, macOS, Windows](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](#platform-support)
 
@@ -56,7 +57,7 @@ Install a specific version:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/luckeyfaraday/athena-code/main/scripts/install.sh |
-  bash -s -- --version v0.2.0
+  bash -s -- --version v0.2.1
 ```
 
 See [GitHub Releases](https://github.com/luckeyfaraday/athena-code/releases)
