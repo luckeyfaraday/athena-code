@@ -81,6 +81,8 @@ Requirements:
 - Git
 - Node.js with `npx`
 - At least 5 GB of free temporary disk space
+- Visual Studio 2022 Build Tools with **Desktop development with C++** on
+  Windows
 
 ```bash
 git clone https://github.com/luckeyfaraday/athena-code.git

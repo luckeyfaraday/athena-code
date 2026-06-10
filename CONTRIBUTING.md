@@ -19,6 +19,8 @@ Requirements:
 - Git
 - Node.js with `npx`
 - At least 5 GB of free temporary disk space for a full build
+- Visual Studio 2022 Build Tools with **Desktop development with C++** when
+  building on Windows
 
 Clone and test:
 
