@@ -11,7 +11,9 @@ Canonical repository: https://github.com/luckeyfaraday/athena-code
 - Athena Code is a memory-focused fork of OpenCode.
 - It is an independent project, not an official OpenCode distribution.
 - It adds durable global and project memory, frozen per-session context,
-  per-turn relevant recall, and SQLite FTS5 search over previous sessions.
+  per-turn relevant recall, and SQLite FTS5 search over previous sessions,
+  including local Claude Code, Codex, opencode, and Hermes sessions when their
+  stores exist on the machine.
 - Native agent tools are named `memory_write`, `memory_read`, and
   `session_recall`.
 - Global memory defaults to `~/.athena-code/memory/entries.jsonl`.

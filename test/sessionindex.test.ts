@@ -1,11 +1,15 @@
 import { beforeEach, test, expect } from "bun:test"
-import { chmodSync, existsSync, mkdtempSync } from "node:fs"
+import { Database } from "bun:sqlite"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import {
+  athenaOwnedSessionIds,
   indexMessages,
+  indexScannedSessions,
   indexSessionMessages,
   readSessionRecall,
+  readSourceFingerprints,
   searchSessions,
   sessionRecallEntry,
   sessionIndexPath,
@@ -161,6 +165,127 @@ test("recall excludes the active session", () => {
 
   const search = readSessionRecall(ws, "standup", 5, "s2")
   expect(search.hits).toEqual([])
+})
+
+test("live-indexed hits carry the athena agent tag", () => {
+  const ws = workspace("athftsagent-")
+  indexMessages(ws, corpus)
+  const hits = searchSessions(ws, "standup")
+  expect(hits.length).toBeGreaterThan(0)
+  expect(hits.every((hit) => hit.agent === "athena")).toBe(true)
+})
+
+test("scanned sessions index under their agent and filter by agent", () => {
+  const ws = workspace("athftsscan-")
+  indexMessages(ws, corpus)
+  const inserted = indexScannedSessions("claude", [
+    {
+      sourceId: "claude-uuid-1",
+      sourcePath: "/fixtures/claude/claude-uuid-1.jsonl",
+      fingerprint: "1:100",
+      workspace: "/home/x/proj",
+      messages: [
+        { role: "user", ts: "2026-06-03T08:00:00Z", text: "tighten the manifold rate limiter threshold" },
+        { role: "assistant", ts: "2026-06-03T08:00:05Z", text: "set the manifold limiter to 50 rps" },
+      ],
+    },
+  ])
+  expect(inserted).toBe(2)
+
+  const all = searchSessions(ws, "manifold limiter")
+  expect(all.some((hit) => hit.agent === "claude")).toBe(true)
+  const athenaOnly = searchSessions(ws, "manifold limiter", 5, undefined, "athena")
+  expect(athenaOnly).toEqual([])
+  const claudeOnly = searchSessions(ws, "manifold limiter", 5, undefined, "claude")
+  expect(claudeOnly.length).toBe(2)
+  expect(claudeOnly.every((hit) => hit.session_id === "claude-uuid-1")).toBe(true)
+
+  expect(readSourceFingerprints("claude").get("claude-uuid-1")).toBe("1:100")
+  // Rescanning the same content adds nothing but refreshes the fingerprint.
+  expect(
+    indexScannedSessions("claude", [
+      {
+        sourceId: "claude-uuid-1",
+        sourcePath: "/fixtures/claude/claude-uuid-1.jsonl",
+        fingerprint: "2:120",
+        workspace: "/home/x/proj",
+        messages: [{ role: "user", ts: "2026-06-03T08:00:00Z", text: "tighten the manifold rate limiter threshold" }],
+      },
+    ]),
+  ).toBe(0)
+  expect(readSourceFingerprints("claude").get("claude-uuid-1")).toBe("2:120")
+})
+
+test("live indexing reclaims a session previously scanned from the opencode store", () => {
+  const ws = workspace("athftsreclaim-")
+  indexScannedSessions("opencode", [
+    {
+      sourceId: "ses_shared",
+      sourcePath: "/fixtures/opencode.db#ses_shared",
+      fingerprint: "1700000000",
+      workspace: ws,
+      messages: [{ role: "user", ts: "2026-06-04T09:00:00Z", text: "wire the telemetry exporter into the gateway" }],
+    },
+  ])
+  expect(athenaOwnedSessionIds(["ses_shared"]).size).toBe(0)
+
+  indexMessages(ws, [
+    { sessionId: "ses_shared", role: "user", ts: "msg_1", text: "wire the telemetry exporter into the gateway" },
+  ])
+  const hits = searchSessions(ws, "telemetry exporter gateway")
+  expect(hits.length).toBe(1)
+  expect(hits[0].agent).toBe("athena")
+  expect(athenaOwnedSessionIds(["ses_shared", "ses_other"])).toEqual(new Set(["ses_shared"]))
+})
+
+function createV1Index(): string {
+  const path = sessionIndexPath()
+  mkdirSync(dirname(path), { recursive: true })
+  const db = new Database(path)
+  db.run(
+    `CREATE TABLE IF NOT EXISTS messages (
+       id INTEGER PRIMARY KEY AUTOINCREMENT,
+       session_id TEXT NOT NULL,
+       workspace TEXT NOT NULL,
+       role TEXT NOT NULL,
+       ts TEXT NOT NULL,
+       text TEXT NOT NULL,
+       UNIQUE(session_id, role, ts, text)
+     )`,
+  )
+  db.run("CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(text, content='messages', content_rowid='id')")
+  db.run(
+    `CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
+       INSERT INTO messages_fts(rowid, text) VALUES (new.id, new.text);
+     END`,
+  )
+  db.run("INSERT INTO messages (session_id, workspace, role, ts, text) VALUES ('v1', '/old', 'user', 't1', 'legacy pre-agent row')")
+  db.close()
+  return path
+}
+
+test("a v1 index is rebuilt on the next write", () => {
+  const ws = workspace("athftsmigrate-")
+  const path = createV1Index()
+  expect(indexMessages(ws, corpus)).toBe(4)
+  const db = new Database(path, { readonly: true })
+  try {
+    const version = (db.query("PRAGMA user_version").get() as { user_version: number }).user_version
+    expect(version).toBe(2)
+  } finally {
+    db.close()
+  }
+  // The legacy row is dropped by the rebuild; the index is derived data.
+  expect(searchSessions(ws, "legacy pre-agent row")).toEqual([])
+  expect(searchSessions(ws, "standup").length).toBeGreaterThan(0)
+})
+
+test("reading a v1 index reports empty instead of failing", () => {
+  const ws = workspace("athftsv1read-")
+  createV1Index()
+  const result = readSessionRecall(ws, "legacy")
+  expect(result.empty_index).toBe(true)
+  expect(result.hits).toEqual([])
 })
 
 test("last session returns bounded beginning and ending context", () => {

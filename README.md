@@ -26,8 +26,9 @@ local-first memory layer directly to the agent loop:
   workflow notes for future sessions.
 - **Automatic contextual recall:** retrieve relevant memories for the current
   request without sending the entire memory store on every turn.
-- **Cross-session search:** index and search previous Athena Code conversations
-  with SQLite FTS5.
+- **Cross-session, cross-agent search:** index and search previous
+  conversations with SQLite FTS5 — Athena Code's own, plus local Claude Code,
+  Codex, opencode, and Hermes session stores when present.
 - **Frozen session context:** build one deterministic memory snapshot per
   session and reuse it across tool calls.
 - **Native agent tools:** expose `memory_write`, `memory_read`, and
@@ -146,7 +147,7 @@ without rebuilding or resending everything continuously.
 | Project memory | Repository-specific facts and context | Stored inside the project |
 | Frozen snapshot | Bounded memory context for one agent session | Built once and reused byte-for-byte |
 | Turn recall | Memories relevant to the current request | Recomputed once per user turn |
-| Session index | Searchable excerpts from previous conversations | Indexed locally with SQLite FTS5 |
+| Session index | Searchable excerpts from previous conversations across local agents (Athena Code, Claude Code, Codex, opencode, Hermes) | Indexed locally with SQLite FTS5, rescanned incrementally in the background |
 
 Memory locations:
 
