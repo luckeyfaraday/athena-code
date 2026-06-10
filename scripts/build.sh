@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE="${ATHENA_OPENCODE_SOURCE:-/tmp/athena-opencode-source}"
 REVISION="1772e8ee6e794d1241dac6fa10d28e708f53b881"
+VERSION="${ATHENA_CODE_VERSION:-0.0.0-dev}"
 # This build clones a repo and installs node_modules (~3GB) under SOURCE, which
 # defaults to /tmp. Leaving it behind is a top contributor to /tmp filling up and
 # the resulting ENOSPC/SIGBUS crashes, so clean it on exit unless asked to keep it
@@ -44,5 +45,5 @@ cp -R "$ROOT/overlay/." "$SOURCE/"
 
 cd "$SOURCE"
 npx --yes bun@1.3.14 install --frozen-lockfile
-npx --yes bun@1.3.14 run --cwd packages/opencode script/build.ts --single --skip-install --skip-embed-web-ui
+OPENCODE_VERSION="$VERSION" npx --yes bun@1.3.14 run --cwd packages/opencode script/build.ts --single --skip-install --skip-embed-web-ui
 install -D packages/opencode/dist/opencode-linux-x64/bin/opencode "$ROOT/runtime-bin/linux-x64/athena-code"

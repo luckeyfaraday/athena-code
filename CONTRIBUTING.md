@@ -34,6 +34,13 @@ Build the executable:
 ./scripts/build.sh
 ```
 
+Local builds report version `0.0.0-dev`. Set `ATHENA_CODE_VERSION` when testing
+version-specific packaging:
+
+```bash
+ATHENA_CODE_VERSION=0.1.0 ./scripts/build.sh
+```
+
 The build clones the pinned OpenCode revision into
 `${ATHENA_OPENCODE_SOURCE:-/tmp/athena-opencode-source}`. Set
 `ATHENA_TUI_KEEP_SOURCE=1` to retain that checkout for iterative development.

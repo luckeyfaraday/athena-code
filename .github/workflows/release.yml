@@ -16,7 +16,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build Athena Code
-        run: ./scripts/build.sh
+        run: |
+          version="0.0.0-dev"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          ATHENA_CODE_VERSION="$version" ./scripts/build.sh
 
       - name: Package binary
         run: |
