@@ -19,7 +19,7 @@ index 67a64d58c..8413160de 100644
      if (
        msg?.startsWith("Unknown argument") ||
 diff --git a/packages/opencode/src/session/prompt.ts b/packages/opencode/src/session/prompt.ts
-index 701c63234..ed3b49b45 100644
+index 701c63234..5add3cbca 100644
 --- a/packages/opencode/src/session/prompt.ts
 +++ b/packages/opencode/src/session/prompt.ts
 @@ -15,6 +15,11 @@ import type { JSONSchema7 } from "@ai-sdk/provider"
@@ -34,7 +34,18 @@ index 701c63234..ed3b49b45 100644
  import { Plugin } from "../plugin"
  import MAX_STEPS from "../session/prompt/max-steps.txt"
  import { ToolRegistry } from "@/tool/registry"
-@@ -1417,6 +1422,23 @@ export const layer = Layer.effect(
+@@ -132,6 +137,10 @@ export const layer = Layer.effect(
+     const flags = yield* RuntimeFlags.Service
+     const database = yield* Database.Service
+     const { db } = database
++    // Kick the cross-agent session scan (and any pending index migration) as
++    // soon as the server instance boots, not only on chat turns: /find-sessions
++    // must have data on a fresh launch before the first message is sent.
++    scheduleAgentScan()
+     const ops = Effect.fn("SessionPrompt.ops")(function* () {
+       return {
+         cancel: (sessionID: SessionID) => cancel(sessionID),
+@@ -1417,6 +1426,23 @@ export const layer = Layer.effect(
                MessageV2.toModelMessagesEffect(msgs, model),
              ])
              const system = [...env, ...instructions, ...(skills ? [skills] : [])]
@@ -226,7 +237,7 @@ index b309edcd9..4751cae9c 100644
      default: defaultSoundPath,
 diff --git a/packages/tui/src/branding.ts b/packages/tui/src/branding.ts
 new file mode 100644
-index 0000000..632197e
+index 000000000..632197e1f
 --- /dev/null
 +++ b/packages/tui/src/branding.ts
 @@ -0,0 +1,11 @@
