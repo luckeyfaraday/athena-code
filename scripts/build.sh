@@ -70,9 +70,12 @@ fi
 git -C "$SOURCE" config core.autocrlf false
 git -C "$SOURCE" fetch origin "$REVISION"
 git -C "$SOURCE" checkout --detach --force "$REVISION"
-# The outer checkout may use Windows CRLF. Normalize the patch stream because
+# The outer checkout may use Windows CRLF. Normalize each patch stream because
 # its context must match the LF-only pinned upstream checkout byte-for-byte.
-sed 's/\r$//' "$ROOT/patches/opencode-branding.patch" | git -C "$SOURCE" apply -
+# Patches apply in name order and must touch disjoint upstream files.
+for patch in "$ROOT"/patches/*.patch; do
+  sed 's/\r$//' "$patch" | git -C "$SOURCE" apply -
+done
 
 # Overlay Athena-owned native source (memory store + frozen snapshot) on top of
 # the patched checkout. These are maintained as real files under Athena code/
