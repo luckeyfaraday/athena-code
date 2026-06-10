@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test"
+import { beforeEach, test, expect } from "bun:test"
 import { chmodSync, existsSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -8,11 +8,16 @@ import {
   readSessionRecall,
   searchSessions,
   sessionRecallEntry,
+  sessionIndexPath,
 } from "../overlay/packages/opencode/src/session/memory/sessionindex"
 
 function workspace(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))
 }
+
+beforeEach(() => {
+  process.env.ATHENA_CODE_HOME = workspace("athhome-session-")
+})
 
 const corpus = [
   { sessionId: "s1", role: "user", ts: "2026-06-01T10:00:00Z", text: "how do we roll back a bad deploy on the staging cluster" },
@@ -42,6 +47,18 @@ test("search resolves the correct session id across sessions", () => {
   indexMessages(ws, corpus)
   const hits = searchSessions(ws, "when is standup")
   expect(hits[0].session_id).toBe("s2")
+})
+
+test("search spans sessions indexed from different workspaces", () => {
+  const first = workspace("athftsglobal-a-")
+  const second = workspace("athftsglobal-b-")
+  indexMessages(first, [corpus[0], corpus[1]])
+  indexMessages(second, [corpus[2], corpus[3]])
+
+  const deploy = searchSessions(second, "rollback deploy")
+  expect(deploy.some((hit) => hit.workspace === first)).toBe(true)
+  const standup = searchSessions(first, "standup")
+  expect(standup.some((hit) => hit.workspace === second)).toBe(true)
 })
 
 test("empty / stopword-only query returns nothing", () => {
@@ -109,12 +126,13 @@ test("searching an uninitialized workspace does not create a session index", () 
   const ws = workspace("athftsreadonly-empty-")
   expect(readSessionRecall(ws, "deploy").empty_index).toBe(true)
   expect(existsSync(join(ws, ".context-workspace"))).toBe(false)
+  expect(existsSync(sessionIndexPath())).toBe(false)
 })
 
 test("session recall can read an existing read-only index", () => {
   const ws = workspace("athftsreadonly-")
   indexMessages(ws, corpus)
-  const dbPath = join(ws, ".context-workspace", "context", "sessions.db")
+  const dbPath = sessionIndexPath()
   chmodSync(dbPath, 0o444)
   try {
     const result = readSessionRecall(ws, "standup")
@@ -131,4 +149,38 @@ test("last session returns the most recently indexed session", () => {
   expect(result.hits.length).toBeGreaterThan(0)
   expect(result.hits.every((hit) => hit.session_id === "s2")).toBe(true)
   expect(result.hits.some((hit) => hit.text.includes("standup"))).toBe(true)
+})
+
+test("recall excludes the active session", () => {
+  const ws = workspace("athftsexclude-")
+  indexMessages(ws, corpus)
+
+  const latest = readSessionRecall(ws, "last session", 5, "s2")
+  expect(latest.hits.length).toBeGreaterThan(0)
+  expect(latest.hits.every((hit) => hit.session_id === "s1")).toBe(true)
+
+  const search = readSessionRecall(ws, "standup", 5, "s2")
+  expect(search.hits).toEqual([])
+})
+
+test("last session returns bounded beginning and ending context", () => {
+  const ws = workspace("athftsbookends-")
+  indexMessages(
+    ws,
+    Array.from({ length: 8 }, (_, index) => ({
+      sessionId: "long-session",
+      role: index % 2 === 0 ? "user" : "assistant",
+      ts: `msg-${index}`,
+      text: `turn ${index}`,
+    })),
+  )
+
+  const result = readSessionRecall(ws, "last session")
+  expect(result.hits.map((hit) => hit.text)).toEqual([
+    "turn 0",
+    "turn 1",
+    "turn 5",
+    "turn 6",
+    "turn 7",
+  ])
 })

@@ -152,7 +152,7 @@ Memory locations:
 
 - Global memory: `~/.athena-code/memory/entries.jsonl`
 - Project memory: `<project>/.context-workspace/memory/entries.jsonl`
-- Session search index: `<project>/.context-workspace/context/sessions.db`
+- Global cross-project session search index: `~/.athena-code/context/sessions.db`
 
 Set `ATHENA_CODE_HOME` to change the global Athena Code data directory.
 

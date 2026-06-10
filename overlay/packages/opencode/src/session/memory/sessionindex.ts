@@ -8,7 +8,8 @@
 
 import { Database } from "bun:sqlite"
 import { existsSync, mkdirSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { homedir } from "node:os"
+import { dirname, join, resolve } from "node:path"
 import { bounded } from "./store"
 import { tokenize } from "./recall"
 
@@ -16,19 +17,21 @@ const MAX_SESSION_RECALL_CHARS = 3_000
 const MAX_HIT_CHARS = 400
 const DEFAULT_LIMIT = 5
 
-function databasePath(workspace: string): string {
-  return join(resolve(workspace), ".context-workspace", "context", "sessions.db")
+export function sessionIndexPath(): string {
+  const home = resolve(process.env.ATHENA_CODE_HOME || join(homedir(), ".athena-code"))
+  return join(home, "context", "sessions.db")
 }
 
-function openWritable(workspace: string): Database {
-  const dir = join(resolve(workspace), ".context-workspace", "context")
-  mkdirSync(dir, { recursive: true })
-  const db = new Database(databasePath(workspace))
+function openWritable(): Database {
+  const path = sessionIndexPath()
+  mkdirSync(dirname(path), { recursive: true })
+  const db = new Database(path)
   db.run("PRAGMA journal_mode = WAL")
   db.run(
     `CREATE TABLE IF NOT EXISTS messages (
        id INTEGER PRIMARY KEY AUTOINCREMENT,
        session_id TEXT NOT NULL,
+       workspace TEXT NOT NULL,
        role TEXT NOT NULL,
        ts TEXT NOT NULL,
        text TEXT NOT NULL,
@@ -47,8 +50,8 @@ function openWritable(workspace: string): Database {
   return db
 }
 
-function openReadonly(workspace: string): Database | null {
-  const path = databasePath(workspace)
+function openReadonly(): Database | null {
+  const path = sessionIndexPath()
   if (!existsSync(path)) return null
   return new Database(path, { readonly: true })
 }
@@ -62,6 +65,7 @@ export interface SessionMessage {
 
 export interface SessionHit {
   session_id: string
+  workspace: string
   role: string
   ts: string
   text: string
@@ -85,13 +89,16 @@ export interface MessageLike {
 export function indexMessages(workspace: string, messages: SessionMessage[]): number {
   const rows = messages.filter((m) => m.text.trim())
   if (rows.length === 0) return 0
-  const db = openWritable(workspace)
+  const root = resolve(workspace)
+  const db = openWritable()
   try {
     const count = () => (db.query("SELECT COUNT(*) AS c FROM messages").get() as { c: number }).c
     const before = count()
-    const stmt = db.prepare("INSERT OR IGNORE INTO messages (session_id, role, ts, text) VALUES (?, ?, ?, ?)")
+    const stmt = db.prepare(
+      "INSERT OR IGNORE INTO messages (session_id, workspace, role, ts, text) VALUES (?, ?, ?, ?, ?)",
+    )
     const tx = db.transaction((items: SessionMessage[]) => {
-      for (const m of items) stmt.run(m.sessionId, m.role, m.ts, m.text.trim())
+      for (const m of items) stmt.run(m.sessionId, root, m.role, m.ts, m.text.trim())
     })
     tx(rows)
     return count() - before // true rows inserted, robust to trigger/changes semantics
@@ -108,44 +115,59 @@ function matchExpression(query: string): string {
   return tokens.map((t) => `"${t}"`).join(" OR ")
 }
 
-export function searchSessions(workspace: string, query: string, limit = DEFAULT_LIMIT): SessionHit[] {
+export function searchSessions(
+  _workspace: string,
+  query: string,
+  limit = DEFAULT_LIMIT,
+  excludeSessionId?: string,
+): SessionHit[] {
   const match = matchExpression(query)
   if (!match) return []
-  const db = openReadonly(workspace)
+  const db = openReadonly()
   if (!db) return []
   try {
     return db
       .query(
-        `SELECT m.session_id AS session_id, m.role AS role, m.ts AS ts, m.text AS text,
+        `SELECT m.session_id AS session_id, m.workspace AS workspace,
+                m.role AS role, m.ts AS ts, m.text AS text,
                 bm25(messages_fts) AS score
          FROM messages_fts JOIN messages m ON m.id = messages_fts.rowid
-         WHERE messages_fts MATCH ?
+         WHERE messages_fts MATCH ? AND (? IS NULL OR m.session_id != ?)
          ORDER BY score ASC
          LIMIT ?`,
       )
-      .all(match, limit) as SessionHit[]
+      .all(match, excludeSessionId ?? null, excludeSessionId ?? null, limit) as SessionHit[]
   } finally {
     db.close()
   }
 }
 
-function latestSession(workspace: string, limit = DEFAULT_LIMIT): SessionHit[] {
-  const db = openReadonly(workspace)
+function latestSession(limit = DEFAULT_LIMIT, excludeSessionId?: string): SessionHit[] {
+  const db = openReadonly()
   if (!db) return []
   try {
     const latest = db
-      .query("SELECT session_id FROM messages ORDER BY id DESC LIMIT 1")
-      .get() as { session_id: string } | null
-    if (!latest) return []
-    return db
       .query(
-        `SELECT session_id, role, ts, text, 0 AS score
+        `SELECT session_id
+         FROM messages
+         WHERE (? IS NULL OR session_id != ?)
+         ORDER BY id DESC
+         LIMIT 1`,
+      )
+      .get(excludeSessionId ?? null, excludeSessionId ?? null) as { session_id: string } | null
+    if (!latest) return []
+    const rows = db
+      .query(
+        `SELECT id, session_id, workspace, role, ts, text, 0 AS score
          FROM messages
          WHERE session_id = ?
-         ORDER BY id ASC
-         LIMIT ?`,
+         ORDER BY id ASC`,
       )
-      .all(latest.session_id, limit) as SessionHit[]
+      .all(latest.session_id) as Array<SessionHit & { id: number }>
+    if (rows.length <= limit) return rows
+    const headCount = Math.floor(limit / 2)
+    const tailCount = limit - headCount
+    return [...rows.slice(0, headCount), ...rows.slice(-tailCount)]
   } finally {
     db.close()
   }
@@ -179,9 +201,10 @@ export function readSessionRecall(
   workspace: string,
   query: string,
   limit = DEFAULT_LIMIT,
+  excludeSessionId?: string,
 ): { hits: SessionHit[]; query: string; empty_index: boolean } {
   const normalized = query.trim()
-  const db = openReadonly(workspace)
+  const db = openReadonly()
   if (!db) return { hits: [], query: normalized, empty_index: true }
   try {
     const total = (db.query("SELECT COUNT(*) AS c FROM messages").get() as { c: number }).c
@@ -190,18 +213,27 @@ export function readSessionRecall(
     db.close()
   }
   if (requestsLatestSession(normalized)) {
-    return { hits: latestSession(workspace, limit), query: normalized, empty_index: false }
+    return { hits: latestSession(limit, excludeSessionId), query: normalized, empty_index: false }
   }
-  return { hits: searchSessions(workspace, normalized, limit), query: normalized, empty_index: false }
+  return {
+    hits: searchSessions(workspace, normalized, limit, excludeSessionId),
+    query: normalized,
+    empty_index: false,
+  }
 }
 
 // Fenced recall block from prior sessions, or "" when nothing matches. Sibling of
 // recall.ts's recallSystemEntry; the wiring step merges both into the turn.
-export function sessionRecallEntry(workspace: string, query: string, limit = DEFAULT_LIMIT): string {
-  const hits = searchSessions(workspace, query, limit)
+export function sessionRecallEntry(
+  workspace: string,
+  query: string,
+  limit = DEFAULT_LIMIT,
+  excludeSessionId?: string,
+): string {
+  const hits = searchSessions(workspace, query, limit, excludeSessionId)
   if (hits.length === 0) return ""
   const body = hits
-    .map((h) => `- [${h.role} ${h.ts}] ${bounded(h.text, MAX_HIT_CHARS).text}`)
+    .map((h) => `- [${h.workspace} ${h.role} ${h.ts}] ${bounded(h.text, MAX_HIT_CHARS).text}`)
     .join("\n")
   return [
     `<athena-session-recall query=${JSON.stringify(query.trim().slice(0, 120))}>`,

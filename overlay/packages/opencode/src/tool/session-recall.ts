@@ -9,14 +9,14 @@ export const Parameters = Schema.Struct({
   }),
 })
 
-function renderSessionRecall(params: { query: string }, workspace: string): {
+function renderSessionRecall(params: { query: string }, workspace: string, sessionId?: string): {
   title: string
   metadata: Record<string, unknown>
   output: string
 } {
   let result: ReturnType<typeof readSessionRecall>
   try {
-    result = readSessionRecall(workspace, params.query)
+    result = readSessionRecall(workspace, params.query, undefined, sessionId)
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     return {
@@ -50,7 +50,7 @@ function renderSessionRecall(params: { query: string }, workspace: string): {
     title: "Session recall",
     metadata: { empty_index: false, count: result.hits.length, query: result.query },
     output: result.hits
-      .map((hit) => `- [${hit.session_id} ${hit.role} ${hit.ts}] ${hit.text}`)
+      .map((hit) => `- [${hit.session_id} ${hit.workspace} ${hit.role} ${hit.ts}] ${hit.text}`)
       .join("\n"),
   }
 }
@@ -60,12 +60,12 @@ export const SessionRecallTool = Tool.define(
   Effect.gen(function* () {
     return {
       description:
-        "Search prior Athena Code session turns for episodic recall. Use when the user asks what was discussed before, references another session, or asks to recover prior work.",
+        "Search prior Athena Code session turns across all workspaces. Use when the user asks what was discussed before, references another session, or asks to recover prior work.",
       parameters: Parameters,
-      execute: (params: { query: string }) =>
+      execute: (params: { query: string }, context: Tool.Context) =>
         Effect.gen(function* () {
           const instance = yield* InstanceState.context
-          return renderSessionRecall(params, instance.worktree)
+          return renderSessionRecall(params, instance.worktree, context.sessionID)
         }),
     }
   }),

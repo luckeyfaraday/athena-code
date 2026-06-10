@@ -16,8 +16,8 @@ Canonical repository: https://github.com/luckeyfaraday/athena-code
   `session_recall`.
 - Global memory defaults to `~/.athena-code/memory/entries.jsonl`.
 - Project memory defaults to `<project>/.context-workspace/memory/`.
-- The project session index defaults to
-  `<project>/.context-workspace/context/sessions.db`.
+- The global cross-project session index defaults to
+  `~/.athena-code/context/sessions.db`.
 - Native memory is local-first; configured model providers still receive model
   requests through the underlying OpenCode provider system.
 - Native release targets cover Linux, macOS, and Windows on x64 and ARM64.
