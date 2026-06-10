@@ -1,5 +1,5 @@
 diff --git a/packages/opencode/src/index.ts b/packages/opencode/src/index.ts
-index 67a64d5..8413160 100644
+index 67a64d58c..8413160de 100644
 --- a/packages/opencode/src/index.ts
 +++ b/packages/opencode/src/index.ts
 @@ -29,6 +29,7 @@ import { WebCommand } from "./cli/cmd/web"
@@ -19,7 +19,7 @@ index 67a64d5..8413160 100644
      if (
        msg?.startsWith("Unknown argument") ||
 diff --git a/packages/opencode/src/session/prompt.ts b/packages/opencode/src/session/prompt.ts
-index 701c632..0e45190 100644
+index 701c63234..ed3b49b45 100644
 --- a/packages/opencode/src/session/prompt.ts
 +++ b/packages/opencode/src/session/prompt.ts
 @@ -15,6 +15,11 @@ import type { JSONSchema7 } from "@ai-sdk/provider"
@@ -59,7 +59,7 @@ index 701c632..0e45190 100644
              if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
              const result = yield* handle.process({
 diff --git a/packages/opencode/src/temporary.ts b/packages/opencode/src/temporary.ts
-index e7abd0d..481436b 100644
+index e7abd0dc9..481436b7f 100644
 --- a/packages/opencode/src/temporary.ts
 +++ b/packages/opencode/src/temporary.ts
 @@ -1,5 +1,6 @@
@@ -76,7 +76,7 @@ index e7abd0d..481436b 100644
 +  .command(MemoryCommand)
    .parse()
 diff --git a/packages/opencode/src/tool/registry.ts b/packages/opencode/src/tool/registry.ts
-index f2ab972..b40c3a4 100644
+index f2ab972e3..b40c3a44b 100644
 --- a/packages/opencode/src/tool/registry.ts
 +++ b/packages/opencode/src/tool/registry.ts
 @@ -13,6 +13,9 @@ import { WebFetchTool } from "./webfetch"
@@ -120,7 +120,7 @@ index f2ab972..b40c3a4 100644
              ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
            ],
 diff --git a/packages/tui/src/app.tsx b/packages/tui/src/app.tsx
-index ec1fe4d..078efed 100644
+index ec1fe4d7d..83d66debb 100644
 --- a/packages/tui/src/app.tsx
 +++ b/packages/tui/src/app.tsx
 @@ -4,6 +4,7 @@ import { Deferred, Effect } from "effect"
@@ -131,7 +131,24 @@ index ec1fe4d..078efed 100644
  import { ClipboardProvider, useClipboard } from "./context/clipboard"
  import { EpilogueProvider } from "./context/epilogue"
  import * as Selection from "./util/selection"
-@@ -420,24 +421,24 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
+@@ -31,7 +32,7 @@ import { ProjectProvider, useProject } from "./context/project"
+ import { EditorContextProvider } from "./context/editor"
+ import { useEvent } from "./context/event"
+ import { SDKProvider, useSDK } from "./context/sdk"
+-import { StartupLoading } from "./component/startup-loading"
++import { AthenaSplash } from "./component/athena-splash"
+ import { SyncProvider, useSync } from "./context/sync"
+ import { SyncProviderV2 } from "./context/sync-v2"
+ import { LocalProvider, useLocal } from "./context/local"
+@@ -43,6 +44,7 @@ import { DialogThemeList } from "./component/dialog-theme-list"
+ import { DialogHelp } from "./ui/dialog-help"
+ import { DialogAgent } from "./component/dialog-agent"
+ import { DialogSessionList } from "./component/dialog-session-list"
++import { DialogAthenaSessions } from "./component/dialog-athena-sessions"
+ import { DialogWorkspaceList } from "./component/dialog-workspace-list"
+ import { DialogConsoleOrg } from "./component/dialog-console-org"
+ import { ThemeProvider, useTheme } from "./context/theme"
+@@ -420,24 +422,24 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
      if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
  
      if (route.data.type === "home") {
@@ -160,8 +177,34 @@ index ec1fe4d..078efed 100644
      }
    })
  
+@@ -544,6 +546,16 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
+           dialog.replace(() => <DialogSessionList />)
+         },
+       },
++      {
++        name: "session.find_cross_agent",
++        title: "Find sessions across agents",
++        category: "Session",
++        slashName: "find-sessions",
++        slashAliases: ["find", "recall"],
++        run: () => {
++          dialog.replace(() => <DialogAthenaSessions />)
++        },
++      },
+       {
+         name: "session.new",
+         title: "New session",
+@@ -1074,7 +1086,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
+         <pluginRuntime.Slot name="app" />
+       </Show>
+       <Show when={!startup.skipInitialLoading}>
+-        <StartupLoading ready={ready} />
++        <AthenaSplash ready={ready} />
+       </Show>
+     </box>
+   )
 diff --git a/packages/tui/src/attention.ts b/packages/tui/src/attention.ts
-index b309edc..4751cae 100644
+index b309edcd9..4751cae9c 100644
 --- a/packages/tui/src/attention.ts
 +++ b/packages/tui/src/attention.ts
 @@ -38,14 +38,14 @@ type TuiAttentionHost = TuiAttention & {
@@ -199,7 +242,7 @@ index 0000000..632197e
 +export const athenaTerminalPrefix =
 +  athenaRuntimeBrand === "ATHENA CODEX" ? "ACX" : athenaRuntimeBrand === "ATHENA CLAUDE" ? "ACL" : "AC"
 diff --git a/packages/tui/src/component/prompt/index.tsx b/packages/tui/src/component/prompt/index.tsx
-index 0a9f103..4613af9 100644
+index 0a9f103ef..4613af94f 100644
 --- a/packages/tui/src/component/prompt/index.tsx
 +++ b/packages/tui/src/component/prompt/index.tsx
 @@ -15,6 +15,7 @@ import path from "path"
@@ -220,7 +263,7 @@ index 0a9f103..4613af9 100644
  
    function promptModelWarning() {
 diff --git a/packages/tui/src/context/theme.tsx b/packages/tui/src/context/theme.tsx
-index 909dd69..00474c3 100644
+index 909dd69ac..00474c3ad 100644
 --- a/packages/tui/src/context/theme.tsx
 +++ b/packages/tui/src/context/theme.tsx
 @@ -93,7 +93,7 @@ const [store, setStore] = createStore<State>({
@@ -262,7 +305,7 @@ index 909dd69..00474c3 100644
  
      createEffect(() => renderer.setBackgroundColor(values().background))
 diff --git a/packages/tui/src/feature-plugins/home/footer.tsx b/packages/tui/src/feature-plugins/home/footer.tsx
-index 41bee5d..04f3a7a 100644
+index 41bee5da5..04f3a7a68 100644
 --- a/packages/tui/src/feature-plugins/home/footer.tsx
 +++ b/packages/tui/src/feature-plugins/home/footer.tsx
 @@ -1,9 +1,12 @@
@@ -338,7 +381,7 @@ index 41bee5d..04f3a7a 100644
        <Version api={props.api} />
      </box>
 diff --git a/packages/tui/src/logo.ts b/packages/tui/src/logo.ts
-index a58a8cf..6f40d30 100644
+index a58a8cf99..6f40d30d0 100644
 --- a/packages/tui/src/logo.ts
 +++ b/packages/tui/src/logo.ts
 @@ -1,6 +1,10 @@
@@ -355,7 +398,7 @@ index a58a8cf..6f40d30 100644
  
  export const go = {
 diff --git a/packages/tui/src/routes/session/permission.tsx b/packages/tui/src/routes/session/permission.tsx
-index c787a84..7962e78 100644
+index c787a84a8..7962e78aa 100644
 --- a/packages/tui/src/routes/session/permission.tsx
 +++ b/packages/tui/src/routes/session/permission.tsx
 @@ -141,11 +141,11 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
@@ -382,7 +425,7 @@ index c787a84..7962e78 100644
        </box>
        <box
 diff --git a/packages/tui/src/theme/index.ts b/packages/tui/src/theme/index.ts
-index e8a5f2c..eaaa790 100644
+index e8a5f2c5a..eaaa7904e 100644
 --- a/packages/tui/src/theme/index.ts
 +++ b/packages/tui/src/theme/index.ts
 @@ -1,4 +1,5 @@
@@ -400,7 +443,7 @@ index e8a5f2c..eaaa790 100644
    ayu,
    catppuccin,
 diff --git a/packages/tui/src/util/presentation.ts b/packages/tui/src/util/presentation.ts
-index cf432bf..aad5a4f 100644
+index cf432bf96..aad5a4fef 100644
 --- a/packages/tui/src/util/presentation.ts
 +++ b/packages/tui/src/util/presentation.ts
 @@ -1,6 +1,7 @@
