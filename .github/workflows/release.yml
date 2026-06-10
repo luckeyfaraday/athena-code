@@ -29,7 +29,7 @@ jobs:
             runner: macos-15-intel
             archive: tar
           - target: windows-x64
-            runner: windows-2025
+            runner: windows-2025-vs2026
             archive: zip
           - target: windows-arm64
             runner: windows-11-arm
