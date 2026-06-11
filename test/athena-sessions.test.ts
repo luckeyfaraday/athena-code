@@ -116,3 +116,22 @@ test("a vanished workspace falls back to the current directory", () => {
   expect(cmd?.cwd).toBe(process.cwd())
   expect(cmd?.argv).toEqual(["claude", "--resume", "c1"])
 })
+
+test("search collapses identical snippets from rolling sessions to the newest", () => {
+  const ws = workspace("athtui-")
+  seed(ws)
+  for (const id of ["session_20260516_125409_aa.json", "session_20260516_131400_bb.json"]) {
+    indexScannedSessions("hermes", [
+      {
+        sourceId: id,
+        sourcePath: `/fake/${id}`,
+        fingerprint: "f3",
+        workspace: "telegram",
+        messages: [{ role: "user", ts: "seq:0", text: "tune the gravimeter sampling cadence" }],
+      },
+    ])
+  }
+  const hits = searchSessions("gravimeter sampling cadence")
+  expect(hits.length).toBe(1)
+  expect(hits[0].sessionId).toBe("session_20260516_131400_bb.json")
+})

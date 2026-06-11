@@ -20,7 +20,9 @@ import { tokenize } from "./recall"
 const MAX_SESSION_RECALL_CHARS = 3_000
 const MAX_HIT_CHARS = 400
 const DEFAULT_LIMIT = 5
-const SCHEMA_VERSION = 2
+// v3 forces a drop-and-rebuild that purges sessions double-indexed before the
+// scanner learned to skip Hermes `session_*.json` snapshots of .jsonl files.
+const SCHEMA_VERSION = 3
 
 export const ATHENA_AGENT = "athena"
 
@@ -270,17 +272,30 @@ export function searchSessions(
   const db = openReadonly()
   if (!db) return []
   try {
-    return db
+    // Over-fetch, then keep one hit per distinct text: Hermes rolling sessions
+    // copy their full history into each new session file, so without this a
+    // single repeated turn can fill every result slot. The newest copy wins
+    // (id DESC tiebreak on equal scores).
+    const rows = db
       .query(
         `SELECT m.agent AS agent, m.session_id AS session_id, m.workspace AS workspace,
                 m.role AS role, m.ts AS ts, m.text AS text,
                 bm25(messages_fts) AS score
          FROM messages_fts JOIN messages m ON m.id = messages_fts.rowid
          WHERE messages_fts MATCH ? AND (? IS NULL OR m.session_id != ?) AND (? IS NULL OR m.agent = ?)
-         ORDER BY score ASC
+         ORDER BY score ASC, m.id DESC
          LIMIT ?`,
       )
-      .all(match, excludeSessionId ?? null, excludeSessionId ?? null, agent ?? null, agent ?? null, limit) as SessionHit[]
+      .all(match, excludeSessionId ?? null, excludeSessionId ?? null, agent ?? null, agent ?? null, limit * 20) as SessionHit[]
+    const seen = new Set<string>()
+    const out: SessionHit[] = []
+    for (const row of rows) {
+      if (seen.has(row.text)) continue
+      seen.add(row.text)
+      out.push(row)
+      if (out.length >= limit) break
+    }
+    return out
   } finally {
     db.close()
   }

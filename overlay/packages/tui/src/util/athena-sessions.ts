@@ -9,7 +9,7 @@ import { existsSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
-const SCHEMA_VERSION = 2
+const SCHEMA_VERSION = 3
 const TITLE_MAX = 120
 
 export interface AthenaSessionEntry {
@@ -125,22 +125,27 @@ export function searchSessions(query: string, limit = 50): AthenaSessionEntry[] 
            LIMIT 500
          )
          GROUP BY agent, sessionId
-         ORDER BY score ASC
+         ORDER BY score ASC, sessionId DESC
          LIMIT ?`,
       )
-      .all(match, limit) as Array<{ agent: string; sessionId: string; snippet: string }>
+      .all(match, limit * 3) as Array<{ agent: string; sessionId: string; snippet: string }>
     const group = db.prepare(`${GROUP_SELECT} WHERE agent = ? AND session_id = ? GROUP BY agent, session_id`)
-    return hits.flatMap((hit) => {
+    // One result per distinct snippet: Hermes rolling sessions copy their full
+    // history into each new session file, so without this the list shows the
+    // same line many times. Score order plus the sessionId DESC tiebreak keeps
+    // the newest copy (Hermes filenames embed their timestamp).
+    const seen = new Set<string>()
+    const out: AthenaSessionEntry[] = []
+    for (const hit of hits) {
+      if (out.length >= limit) break
+      const snippet = oneLine(hit.snippet)
+      if (seen.has(snippet)) continue
+      seen.add(snippet)
       const row = group.get(hit.agent, hit.sessionId) as GroupRow | null
-      if (!row) return []
-      return [
-        {
-          ...row,
-          title: firstUserText(db, row.agent, row.sessionId),
-          snippet: oneLine(hit.snippet),
-        },
-      ]
-    })
+      if (!row) continue
+      out.push({ ...row, title: firstUserText(db, row.agent, row.sessionId), snippet })
+    }
+    return out
   } finally {
     db.close()
   }
