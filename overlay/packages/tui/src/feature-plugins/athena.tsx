@@ -4,11 +4,6 @@
 // the builtin plugin API.
 import type { TuiPlugin } from "@opencode-ai/plugin/tui"
 import type { BuiltinTuiPlugin } from "./builtins"
-import {
-  DialogAthenaAgents,
-  DialogSpawnAthenaAgent,
-  DialogTellAthenaAgent,
-} from "../component/dialog-athena-agents"
 import { DialogAthenaSessions } from "../component/dialog-athena-sessions"
 import { AthenaHomeHero } from "../component/athena-home-hero"
 import { AthenaWorkingVerb } from "../component/athena-working-verb"
@@ -59,38 +54,6 @@ const tui: TuiPlugin = async (api) => {
         slashAliases: ["find", "recall"],
         run() {
           api.ui.dialog.replace(() => <DialogAthenaSessions />)
-        },
-      },
-      {
-        name: "agent.spawn_local",
-        title: "Spawn local agent",
-        category: "Agent",
-        namespace: "palette",
-        slashName: "spawn-agent",
-        slashAliases: ["spawn"],
-        run() {
-          api.ui.dialog.replace(() => <DialogSpawnAthenaAgent workspace={api.state.path.directory || process.cwd()} />)
-        },
-      },
-      {
-        name: "agent.list_local",
-        title: "List local agents",
-        category: "Agent",
-        namespace: "palette",
-        slashName: "agents",
-        run() {
-          api.ui.dialog.replace(() => <DialogAthenaAgents />)
-        },
-      },
-      {
-        name: "agent.tell_local",
-        title: "Tell local agent",
-        category: "Agent",
-        namespace: "palette",
-        slashName: "tell-agent",
-        slashAliases: ["tell"],
-        run() {
-          api.ui.dialog.replace(() => <DialogTellAthenaAgent />)
         },
       },
     ],

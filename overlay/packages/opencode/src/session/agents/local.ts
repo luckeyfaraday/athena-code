@@ -3,31 +3,31 @@ import { mkdirSync, statSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
-export const AGENT_KINDS = ["claude", "codex", "opencode", "hermes"] as const
+export const LOCAL_AGENT_KINDS = ["claude", "codex", "opencode", "hermes"] as const
 
-export type AthenaAgentKind = (typeof AGENT_KINDS)[number]
-export type AthenaAgentStatus = "running" | "exited" | "error"
+export type LocalAgentKind = (typeof LOCAL_AGENT_KINDS)[number]
+export type LocalAgentStatus = "running" | "exited" | "error"
 
-export interface AthenaAgentSpawnRequest {
-  kind: AthenaAgentKind
+export interface LocalAgentSpawnRequest {
+  kind: LocalAgentKind
   workspace: string
   task: string
 }
 
-export interface AthenaAgentCommand {
+export interface LocalAgentCommand {
   argv: string[]
   cwd: string
 }
 
-export interface AthenaManagedAgent {
+export interface LocalManagedAgent {
   handle: string
-  kind: AthenaAgentKind
+  kind: LocalAgentKind
   workspace: string
   task: string
   argv: string[]
   cwd: string
   pid?: number
-  status: AthenaAgentStatus
+  status: LocalAgentStatus
   startedAt: string
   exitedAt?: string
   exitCode?: number | null
@@ -36,13 +36,13 @@ export interface AthenaManagedAgent {
   output: string
 }
 
-interface AgentRecord extends AthenaManagedAgent {
+interface AgentRecord extends LocalManagedAgent {
   child?: ChildProcessWithoutNullStreams
 }
 
 const OUTPUT_LIMIT = 12_000
 const registry = new Map<string, AgentRecord>()
-const counters = new Map<AthenaAgentKind, number>()
+const counters = new Map<LocalAgentKind, number>()
 
 function isDirectory(path: string): boolean {
   try {
@@ -62,7 +62,7 @@ function appendOutput(agent: AgentRecord, chunk: Buffer | string) {
   agent.output = (agent.output + text).slice(-OUTPUT_LIMIT)
 }
 
-function nextHandle(kind: AthenaAgentKind): string {
+function nextHandle(kind: LocalAgentKind): string {
   const next = (counters.get(kind) ?? 0) + 1
   counters.set(kind, next)
   return `${kind}#${next}`
@@ -78,16 +78,16 @@ function writeLog(handle: string, output: string) {
   try {
     writeFileSync(logPath(handle), output)
   } catch {
-    // Agent lifecycle should not be able to crash the TUI because logging failed.
+    // Agent lifecycle should not be able to fail a chat turn because logging failed.
   }
 }
 
-export function parseAgentKind(value: string): AthenaAgentKind | null {
+export function parseLocalAgentKind(value: string): LocalAgentKind | null {
   const normalized = value.trim().toLowerCase()
-  return (AGENT_KINDS as readonly string[]).includes(normalized) ? (normalized as AthenaAgentKind) : null
+  return (LOCAL_AGENT_KINDS as readonly string[]).includes(normalized) ? (normalized as LocalAgentKind) : null
 }
 
-export function agentCommand(input: AthenaAgentSpawnRequest): AthenaAgentCommand {
+export function localAgentCommand(input: LocalAgentSpawnRequest): LocalAgentCommand {
   const cwd = safeWorkspace(input.workspace)
   const task = input.task.trim()
   switch (input.kind) {
@@ -102,17 +102,14 @@ export function agentCommand(input: AthenaAgentSpawnRequest): AthenaAgentCommand
   }
 }
 
-export function spawnAthenaAgent(input: AthenaAgentSpawnRequest): AthenaManagedAgent {
-  const kind = parseAgentKind(input.kind)
-  if (!kind) throw new Error(`Unknown agent kind: ${input.kind}`)
-  const task = input.task.trim()
-  const command = agentCommand({ kind, workspace: input.workspace, task })
-  const handle = nextHandle(kind)
+export function spawnLocalAgent(input: LocalAgentSpawnRequest): LocalManagedAgent {
+  const command = localAgentCommand(input)
+  const handle = nextHandle(input.kind)
   const agent: AgentRecord = {
     handle,
-    kind,
+    kind: input.kind,
     workspace: command.cwd,
-    task,
+    task: input.task.trim(),
     argv: command.argv,
     cwd: command.cwd,
     status: "running",
@@ -149,21 +146,19 @@ export function spawnAthenaAgent(input: AthenaAgentSpawnRequest): AthenaManagedA
   return publicAgent(agent)
 }
 
-export function listAthenaAgents(): AthenaManagedAgent[] {
+export function listLocalAgents(): LocalManagedAgent[] {
   return Array.from(registry.values()).map(publicAgent)
 }
 
-export function getAthenaAgent(handle: string): AthenaManagedAgent | null {
+export function getLocalAgent(handle: string): LocalManagedAgent | null {
   const agent = registry.get(handle)
   return agent ? publicAgent(agent) : null
 }
 
-export function sendAthenaAgentMessage(handle: string, text: string): AthenaManagedAgent {
+export function sendLocalAgentMessage(handle: string, text: string): LocalManagedAgent {
   const agent = registry.get(handle)
   if (!agent) throw new Error(`No agent found for ${handle}`)
-  if (agent.status !== "running" || !agent.child?.stdin.writable) {
-    throw new Error(`${handle} is not accepting input`)
-  }
+  if (agent.status !== "running" || !agent.child?.stdin.writable) throw new Error(`${handle} is not accepting input`)
   const message = text.trim()
   if (!message) throw new Error("Message is empty")
   agent.child.stdin.write(`${message}\n`)
@@ -171,31 +166,25 @@ export function sendAthenaAgentMessage(handle: string, text: string): AthenaMana
   return publicAgent(agent)
 }
 
-export function stopAthenaAgent(handle: string): AthenaManagedAgent {
+export function stopLocalAgent(handle: string): LocalManagedAgent {
   const agent = registry.get(handle)
   if (!agent) throw new Error(`No agent found for ${handle}`)
   if (agent.status === "running") agent.child?.kill("SIGTERM")
   return publicAgent(agent)
 }
 
-function publicAgent(agent: AgentRecord): AthenaManagedAgent {
+function publicAgent(agent: AgentRecord): LocalManagedAgent {
   const { child: _child, ...rest } = agent
   return { ...rest }
 }
 
-export function formatAgentSummary(agent: AthenaManagedAgent): string {
+export function formatLocalAgentSummary(agent: LocalManagedAgent): string {
   const pid = agent.pid ? ` pid ${agent.pid}` : ""
   const exit = agent.status === "exited" ? ` exit ${agent.exitCode ?? "signal " + agent.signal}` : ""
   return `${agent.handle} ${agent.status}${pid}${exit} · ${agent.task || agent.argv.join(" ")}`
 }
 
-export function parseSpawnFilter(filter: string): { kind: AthenaAgentKind | null; task: string } {
-  const [first = "", ...rest] = filter.trim().split(/\s+/)
-  const kind = parseAgentKind(first)
-  return kind ? { kind, task: rest.join(" ").trim() } : { kind: null, task: filter.trim() }
-}
-
-export function clearAthenaAgentsForTest() {
+export function clearLocalAgentsForTest() {
   for (const agent of registry.values()) {
     if (agent.status === "running") agent.child?.kill("SIGTERM")
   }
