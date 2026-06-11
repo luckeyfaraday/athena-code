@@ -1,6 +1,7 @@
 // Athena Code TUI plugin: registers the cross-agent session finder
-// (/find-sessions), the home-screen hero/command room/footer, and the
-// working verb on top of the stock TUI via the builtin plugin API.
+// (/find-sessions), the home-screen hero/command room/footer, the session
+// sidebar title/footer, and the working verb on top of the stock TUI via
+// the builtin plugin API.
 import type { TuiPlugin } from "@opencode-ai/plugin/tui"
 import type { BuiltinTuiPlugin } from "./builtins"
 import { DialogAthenaSessions } from "../component/dialog-athena-sessions"
@@ -8,6 +9,7 @@ import { AthenaHomeHero } from "../component/athena-home-hero"
 import { AthenaWorkingVerb } from "../component/athena-working-verb"
 import { AthenaCommandRoom } from "./home/athena-command-room"
 import { AthenaHomeFooter } from "./home/athena-status"
+import { AthenaSidebarFooter, AthenaSidebarTitle } from "./sidebar/athena-sidebar"
 
 const id = "internal:athena"
 
@@ -29,6 +31,14 @@ const tui: TuiPlugin = async (api) => {
       },
       session_prompt_right(_ctx, props) {
         return <AthenaWorkingVerb api={api} sessionID={props.session_id} />
+      },
+      sidebar_title(_ctx, props) {
+        return (
+          <AthenaSidebarTitle api={api} sessionID={props.session_id} title={props.title} shareUrl={props.share_url} />
+        )
+      },
+      sidebar_footer(_ctx, props) {
+        return <AthenaSidebarFooter api={api} sessionID={props.session_id} />
       },
     },
   })
