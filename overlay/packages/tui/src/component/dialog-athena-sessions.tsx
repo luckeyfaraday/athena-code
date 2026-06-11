@@ -7,13 +7,12 @@
 
 import { spawn } from "node:child_process"
 import { useRenderer } from "@opentui/solid"
-import { createMemo, onMount } from "solid-js"
+import { createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { useRoute } from "../context/route"
 import { useSync } from "../context/sync"
 import { useDialog } from "../ui/dialog"
 import { DialogSelect, type DialogSelectOption } from "../ui/dialog-select"
 import { useToast } from "../ui/toast"
-import { createDebouncedSignal } from "../util/signal"
 import {
   listRecentSessions,
   resumeCommand,
@@ -41,7 +40,17 @@ export function DialogAthenaSessions() {
   const sync = useSync()
   const toast = useToast()
   const renderer = useRenderer()
-  const [search, setSearch] = createDebouncedSignal("", 150)
+  // Debounced by hand instead of via util/signal's createDebouncedSignal:
+  // that helper's @solid-primitives/scheduled debounce is a silent no-op in
+  // compiled binaries, where the build's conditions:["node"] resolves
+  // solid-js/web to its server bundle and isServer is permanently true.
+  const [search, setSearchNow] = createSignal("")
+  let searchTimer: ReturnType<typeof setTimeout> | undefined
+  const setSearch = (value: string) => {
+    clearTimeout(searchTimer)
+    searchTimer = setTimeout(() => setSearchNow(value), 150)
+  }
+  onCleanup(() => clearTimeout(searchTimer))
 
   const entries = createMemo(() => {
     const query = search().trim()
