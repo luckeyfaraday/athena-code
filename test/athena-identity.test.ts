@@ -7,6 +7,7 @@ import {
   WORKING_VERBS,
   dailyAphorism,
   markLines,
+  OWL_FACE_ROW,
   owlLines,
   verbSeed,
   workingVerb,
@@ -55,9 +56,9 @@ test("the mark blooms six spokes around a hollow centre", () => {
 })
 
 test("owl frames cover idle, blink, thinking, and working ticks", () => {
-  expect(owlLines("idle")).toEqual(["(o,o)", " /)_)"])
-  expect(owlLines("idle", true)[0]).toBe("(-,-)")
-  expect(owlLines("thinking")[0]).toBe("(-,-)")
-  expect(owlLines("working", false, true)[1]).toBe(" /)_)~")
-  expect(owlLines("working", false, false)[1]).toBe(" /)_)")
+  expect(owlLines("idle")).toEqual([",___,", "(o,o)", "/)_)", `-"-"-`])
+  expect(owlLines("idle", true)[OWL_FACE_ROW]).toBe("(-,-)")
+  expect(owlLines("thinking")[OWL_FACE_ROW]).toBe("(-,-)")
+  expect(owlLines("working", false, true)[2]).toBe("/)_)~")
+  expect(owlLines("working", false, false)[2]).toBe("/)_)")
 })

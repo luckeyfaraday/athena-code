@@ -85,9 +85,12 @@ export function markLines(grown: number, spokeLen = 3): string[] {
 export type OwlState = "idle" | "thinking" | "working"
 
 // Pure frame function (rendered by component/athena-owl.tsx) so tests can pin
-// every state without timers or JSX.
-export function owlLines(state: OwlState, blink = false, tick = false): [string, string] {
-  const eyes = state === "thinking" || blink ? "(-,-)" : "(o,o)"
-  const tail = state === "working" && tick ? " /)_)~" : " /)_)"
-  return [eyes, tail]
+// every state without timers or JSX: ear tufts, face, wing, perch. The face
+// is OWL_FACE_ROW so the renderer can light it differently from the body.
+export const OWL_FACE_ROW = 1
+
+export function owlLines(state: OwlState, blink = false, tick = false): string[] {
+  const face = state === "thinking" || blink ? "(-,-)" : "(o,o)"
+  const wing = state === "working" && tick ? "/)_)~" : "/)_)"
+  return [",___,", face, wing, `-"-"-`]
 }

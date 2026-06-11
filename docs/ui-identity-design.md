@@ -156,6 +156,8 @@ unreliable.)
 | 1b | Home hero: mark + wordmark + epithet + meander rule, responsive to terminal height | `home_logo` slot replace (`component/athena-home-hero.tsx`) | none | done 2026-06-11 |
 | 1b | Footer takeover: brand + memory + everything upstream showed (dir/branch, MCP, version) under a bronze rule | `home_footer` slot, order 50 wins single_winner (`home/athena-status.tsx`); old footer shim hunk removed from patch | net negative | done 2026-06-11 |
 | 1b | Prompt placeholder voice ("Brief me on this codebase", …) | branding string-swap hunk in `routes/home.tsx` | one swap hunk | done 2026-06-11 |
+| 1c | Prompt frame: full thin border with ◆ corners replaces the thick left bar + ▀ panel fade (the most opencode-identifying shape) | `athenaPromptFrame` in overlay `branding.ts`; glyph-swap hunks in `component/prompt/index.tsx` | small swap hunks | done 2026-06-11 |
+| 1c | Owl v2: four lines — ear tufts, face (rendered brighter), wing tick, perch | `util/athena-identity.ts` + `component/athena-owl.tsx` | none | done 2026-06-11 |
 | 2 | Owl accompanying the working state | feature plugin component (`component/athena-owl.tsx` exists) | none–low | |
 | 2 | The ledger (end-of-session summary + `/ledger`) | feature plugin + existing command registration pattern | none | |
 | 3 | Laurels (milestone store under `.context-workspace`, footer moment) | feature plugin + small persistence | none | |

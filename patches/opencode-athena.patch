@@ -158,17 +158,20 @@ index b309edcd9..4751cae9c 100644
    sounds: {
      default: defaultSoundPath,
 diff --git a/packages/tui/src/component/prompt/index.tsx b/packages/tui/src/component/prompt/index.tsx
-index 0a9f103ef..4613af94f 100644
+index 0a9f103ef..9d3176251 100644
 --- a/packages/tui/src/component/prompt/index.tsx
 +++ b/packages/tui/src/component/prompt/index.tsx
-@@ -15,6 +15,7 @@ import path from "path"
+@@ -15,8 +15,9 @@ import path from "path"
  import { fileURLToPath } from "url"
  import { useLocal } from "../../context/local"
  import { Flag } from "@opencode-ai/core/flag/flag"
-+import { athenaRuntimeBrand } from "../../branding"
++import { athenaPromptFrame, athenaRuntimeBrand } from "../../branding"
  import { tint, useTheme } from "../../context/theme"
- import { EmptyBorder, SplitBorder } from "../../ui/border"
+-import { EmptyBorder, SplitBorder } from "../../ui/border"
++import { EmptyBorder } from "../../ui/border"
  import { useTuiPaths, useTuiTerminalEnvironment } from "../../context/runtime"
+ import { useClipboard } from "../../context/clipboard"
+ import { Spinner } from "../spinner"
 @@ -205,7 +206,7 @@ export function Prompt(props: PromptProps) {
    const workspace = usePromptWorkspace(props.sessionID)
    const move = usePromptMove({ projectID: project.project, sessionID: () => props.sessionID })
@@ -178,6 +181,39 @@ index 0a9f103ef..4613af94f 100644
    const hasRightContent = createMemo(() => Boolean(props.right))
  
    function promptModelWarning() {
+@@ -1334,12 +1335,9 @@ export function Prompt(props: PromptProps) {
+       <box ref={(r: BoxRenderable) => (anchor = r)} visible={props.visible !== false} width="100%">
+         <box
+           width="100%"
+-          border={["left"]}
++          border={athenaPromptFrame.border}
+           borderColor={borderHighlight()}
+-          customBorderChars={{
+-            ...SplitBorder.customBorderChars,
+-            bottomLeft: "╹",
+-          }}
++          customBorderChars={athenaPromptFrame.chars}
+         >
+           <box
+             paddingLeft={2}
+@@ -1469,7 +1467,7 @@ export function Prompt(props: PromptProps) {
+           borderColor={borderHighlight()}
+           customBorderChars={{
+             ...EmptyBorder,
+-            vertical: theme.backgroundElement.a !== 0 ? "╹" : " ",
++            vertical: " ",
+           }}
+         >
+           <box
+@@ -1480,7 +1478,7 @@ export function Prompt(props: PromptProps) {
+               theme.backgroundElement.a !== 0
+                 ? {
+                     ...EmptyBorder,
+-                    horizontal: "▀",
++                    horizontal: " ",
+                   }
+                 : {
+                     ...EmptyBorder,
 diff --git a/packages/tui/src/context/theme.tsx b/packages/tui/src/context/theme.tsx
 index 909dd69ac..00474c3ad 100644
 --- a/packages/tui/src/context/theme.tsx

@@ -70,8 +70,8 @@ export function AthenaCommandRoom(props: { api: TuiPluginApi }) {
         <Show when={rows().length > 0}>
           <text> </text>
         </Show>
-        <box flexDirection="row" gap={2} alignItems="flex-start">
-          <AthenaOwl state={() => "idle"} color={theme().textMuted} />
+        <box flexDirection="row" gap={2} alignItems="center">
+          <AthenaOwl state={() => "idle"} color={theme().textMuted} faceColor={theme().text} />
           <text fg={theme().textMuted} wrapMode="none">
             “{maxim.text}” — {maxim.source}
           </text>
