@@ -296,8 +296,17 @@ function hermesKeys(root: string): SourceKey[] {
   } catch {
     return keys
   }
+  const names = new Set(entries.filter((e) => e.isFile()).map((e) => e.name))
   for (const entry of entries) {
     if (!entry.isFile() || !(entry.name.endsWith(".json") || entry.name.endsWith(".jsonl"))) continue
+    // Hermes saves some conversations twice: a `<stamp>.jsonl` transcript plus
+    // a `session_<stamp>.json` snapshot of the same turns. Index only the
+    // .jsonl (it carries real timestamps) so the pair doesn't surface as two
+    // sessions with identical content in search.
+    if (entry.name.startsWith("session_") && entry.name.endsWith(".json")) {
+      const sibling = entry.name.slice("session_".length, -".json".length) + ".jsonl"
+      if (names.has(sibling)) continue
+    }
     const path = join(root, entry.name)
     try {
       // Filenames are unique within the sessions dir, so the name is the id.

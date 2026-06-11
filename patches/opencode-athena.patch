@@ -1,7 +1,29 @@
+diff --git a/packages/opencode/src/cli/tui/worker.ts b/packages/opencode/src/cli/tui/worker.ts
+index 31ead18cf..79e40655f 100644
+--- a/packages/opencode/src/cli/tui/worker.ts
++++ b/packages/opencode/src/cli/tui/worker.ts
+@@ -3,7 +3,7 @@ import { Server } from "@/server/server"
+ import * as Log from "@opencode-ai/core/util/log"
+ import { InstanceRuntime } from "@/project/instance-runtime"
+ import { Rpc } from "@/util/rpc"
+-import { upgrade } from "@/cli/upgrade"
++import { upgrade } from "@/cli/athena-upgrade"
+ import { Config } from "@/config/config"
+ import { GlobalBus } from "@/bus/global"
+ import { ServerAuth } from "@/server/auth"
 diff --git a/packages/opencode/src/index.ts b/packages/opencode/src/index.ts
-index 67a64d58c..8413160de 100644
+index 67a64d58c..d94709c92 100644
 --- a/packages/opencode/src/index.ts
 +++ b/packages/opencode/src/index.ts
+@@ -6,7 +6,7 @@ import * as Log from "@opencode-ai/core/util/log"
+ import { ConsoleCommand } from "./cli/cmd/account"
+ import { ProvidersCommand } from "./cli/cmd/providers"
+ import { AgentCommand } from "./cli/cmd/agent"
+-import { UpgradeCommand } from "./cli/cmd/upgrade"
++import { UpgradeCommand } from "./cli/cmd/athena-upgrade"
+ import { UninstallCommand } from "./cli/cmd/uninstall"
+ import { ModelsCommand } from "./cli/cmd/models"
+ import { UI } from "./cli/ui"
 @@ -29,6 +29,7 @@ import { WebCommand } from "./cli/cmd/web"
  import { PrCommand } from "./cli/cmd/pr"
  import { SessionCommand } from "./cli/cmd/session"
@@ -18,57 +40,26 @@ index 67a64d58c..8413160de 100644
    .fail((msg, err) => {
      if (
        msg?.startsWith("Unknown argument") ||
-diff --git a/packages/opencode/src/session/prompt.ts b/packages/opencode/src/session/prompt.ts
-index 701c63234..5add3cbca 100644
---- a/packages/opencode/src/session/prompt.ts
-+++ b/packages/opencode/src/session/prompt.ts
-@@ -15,6 +15,11 @@ import type { JSONSchema7 } from "@ai-sdk/provider"
- import { SessionCompaction } from "./compaction"
- import { SystemPrompt } from "./system"
- import { Instruction } from "./instruction"
-+import { frozenSnapshotSystem } from "./memory/snapshot"
-+import { recallSystemEntry } from "./memory/recall"
-+import { writeMemoryStatus } from "./memory/status"
-+import { indexSessionMessages, sessionRecallEntry } from "./memory/sessionindex"
-+import { scheduleAgentScan } from "./memory/agentscan"
- import { Plugin } from "../plugin"
- import MAX_STEPS from "../session/prompt/max-steps.txt"
- import { ToolRegistry } from "@/tool/registry"
-@@ -132,6 +137,10 @@ export const layer = Layer.effect(
-     const flags = yield* RuntimeFlags.Service
-     const database = yield* Database.Service
-     const { db } = database
-+    // Kick the cross-agent session scan (and any pending index migration) as
-+    // soon as the server instance boots, not only on chat turns: /find-sessions
-+    // must have data on a fresh launch before the first message is sent.
-+    scheduleAgentScan()
-     const ops = Effect.fn("SessionPrompt.ops")(function* () {
-       return {
-         cancel: (sessionID: SessionID) => cancel(sessionID),
-@@ -1417,6 +1426,23 @@ export const layer = Layer.effect(
-               MessageV2.toModelMessagesEffect(msgs, model),
-             ])
-             const system = [...env, ...instructions, ...(skills ? [skills] : [])]
-+            const athenaCtx = yield* InstanceState.context
-+            indexSessionMessages(athenaCtx.worktree, sessionID, msgs)
-+            scheduleAgentScan()
-+
-+            system.push(
-+              frozenSnapshotSystem(athenaCtx.worktree, sessionID, {
-+                agent: process.env.ATHENA_RUNTIME_BRAND?.trim(),
-+              }),
-+            )
-+            const athenaQuery = (msgs.findLast((m) => m.info.role === "user")?.parts ?? [])
-+              .flatMap((part) => (part.type === "text" ? [part.text] : []))
-+              .join("\n")
-+            const athenaRecall = recallSystemEntry(athenaCtx.worktree, athenaQuery)
-+            const athenaSessionRecall = sessionRecallEntry(athenaCtx.worktree, athenaQuery, undefined, sessionID)
-+            writeMemoryStatus(athenaCtx.worktree, athenaQuery)
-+            if (athenaRecall) system.push(athenaRecall)
-+            if (athenaSessionRecall) system.push(athenaSessionRecall)
-             const format = lastUser.format ?? { type: "text" as const }
-             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
-             const result = yield* handle.process({
+diff --git a/packages/opencode/src/plugin/index.ts b/packages/opencode/src/plugin/index.ts
+index 478114209..0b27a34d5 100644
+--- a/packages/opencode/src/plugin/index.ts
++++ b/packages/opencode/src/plugin/index.ts
+@@ -19,6 +19,7 @@ import { CloudflareAIGatewayAuthPlugin, CloudflareWorkersAuthPlugin } from "./cl
+ import { AzureAuthPlugin } from "./azure"
+ import { DigitalOceanAuthPlugin } from "./digitalocean"
+ import { XaiAuthPlugin } from "./xai"
++import { AthenaPlugin } from "./athena"
+ import { Effect, Layer, Context } from "effect"
+ import { EffectBridge } from "@/effect/bridge"
+ import { InstanceState } from "@/effect/instance-state"
+@@ -78,6 +79,7 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
+     AzureAuthPlugin,
+     DigitalOceanAuthPlugin,
+     XaiAuthPlugin,
++    AthenaPlugin,
+   ]
+ }
+ 
 diff --git a/packages/opencode/src/temporary.ts b/packages/opencode/src/temporary.ts
 index e7abd0dc9..481436b7f 100644
 --- a/packages/opencode/src/temporary.ts
@@ -86,52 +77,8 @@ index e7abd0dc9..481436b7f 100644
    .command(TuiThreadCommand)
 +  .command(MemoryCommand)
    .parse()
-diff --git a/packages/opencode/src/tool/registry.ts b/packages/opencode/src/tool/registry.ts
-index f2ab972e3..b40c3a44b 100644
---- a/packages/opencode/src/tool/registry.ts
-+++ b/packages/opencode/src/tool/registry.ts
-@@ -13,6 +13,9 @@ import { WebFetchTool } from "./webfetch"
- import { WriteTool } from "./write"
- import { InvalidTool } from "./invalid"
- import { SkillTool } from "./skill"
-+import { MemoryWriteTool } from "./memory-write"
-+import { MemoryReadTool } from "./memory-read"
-+import { SessionRecallTool } from "./session-recall"
- import * as Tool from "./tool"
- import { Config } from "@/config/config"
- import { type ToolContext as PluginToolContext, type ToolDefinition } from "@opencode-ai/plugin"
-@@ -131,6 +134,9 @@ export const layer: Layer.Layer<
-     const greptool = yield* GrepTool
-     const patchtool = yield* ApplyPatchTool
-     const skilltool = yield* SkillTool
-+    const memoryWriteTool = yield* MemoryWriteTool
-+    const memoryReadTool = yield* MemoryReadTool
-+    const sessionRecallTool = yield* SessionRecallTool
-     const agent = yield* Agent.Service
- 
-     const state = yield* InstanceState.make<State>(
-@@ -235,6 +241,9 @@ export const layer: Layer.Layer<
-           search: Tool.init(websearch),
-           skill: Tool.init(skilltool),
-           patch: Tool.init(patchtool),
-+          memory_write: Tool.init(memoryWriteTool),
-+          memory_read: Tool.init(memoryReadTool),
-+          session_recall: Tool.init(sessionRecallTool),
-           question: Tool.init(question),
-           lsp: Tool.init(lsptool),
-           plan: Tool.init(plan),
-@@ -257,6 +266,9 @@ export const layer: Layer.Layer<
-             tool.search,
-             tool.skill,
-             tool.patch,
-+            tool.memory_write,
-+            tool.memory_read,
-+            tool.session_recall,
-             ...(flags.experimentalLspTool ? [tool.lsp] : []),
-             ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
-           ],
 diff --git a/packages/tui/src/app.tsx b/packages/tui/src/app.tsx
-index ec1fe4d7d..83d66debb 100644
+index ec1fe4d7d..2d8df3866 100644
 --- a/packages/tui/src/app.tsx
 +++ b/packages/tui/src/app.tsx
 @@ -4,6 +4,7 @@ import { Deferred, Effect } from "effect"
@@ -151,15 +98,7 @@ index ec1fe4d7d..83d66debb 100644
  import { SyncProvider, useSync } from "./context/sync"
  import { SyncProviderV2 } from "./context/sync-v2"
  import { LocalProvider, useLocal } from "./context/local"
-@@ -43,6 +44,7 @@ import { DialogThemeList } from "./component/dialog-theme-list"
- import { DialogHelp } from "./ui/dialog-help"
- import { DialogAgent } from "./component/dialog-agent"
- import { DialogSessionList } from "./component/dialog-session-list"
-+import { DialogAthenaSessions } from "./component/dialog-athena-sessions"
- import { DialogWorkspaceList } from "./component/dialog-workspace-list"
- import { DialogConsoleOrg } from "./component/dialog-console-org"
- import { ThemeProvider, useTheme } from "./context/theme"
-@@ -420,24 +422,24 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
+@@ -420,24 +421,24 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
      if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
  
      if (route.data.type === "home") {
@@ -188,24 +127,7 @@ index ec1fe4d7d..83d66debb 100644
      }
    })
  
-@@ -544,6 +546,16 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
-           dialog.replace(() => <DialogSessionList />)
-         },
-       },
-+      {
-+        name: "session.find_cross_agent",
-+        title: "Find sessions across agents",
-+        category: "Session",
-+        slashName: "find-sessions",
-+        slashAliases: ["find", "recall"],
-+        run: () => {
-+          dialog.replace(() => <DialogAthenaSessions />)
-+        },
-+      },
-       {
-         name: "session.new",
-         title: "New session",
-@@ -1074,7 +1086,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
+@@ -1074,7 +1075,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
          <pluginRuntime.Slot name="app" />
        </Show>
        <Show when={!startup.skipInitialLoading}>
@@ -235,23 +157,6 @@ index b309edcd9..4751cae9c 100644
    builtin: true,
    sounds: {
      default: defaultSoundPath,
-diff --git a/packages/tui/src/branding.ts b/packages/tui/src/branding.ts
-new file mode 100644
-index 000000000..632197e1f
---- /dev/null
-+++ b/packages/tui/src/branding.ts
-@@ -0,0 +1,11 @@
-+export type AthenaRuntimeBrand = "ATHENA CODE" | "ATHENA CODEX" | "ATHENA CLAUDE"
-+
-+export const athenaRuntimeBrand = (process.env.ATHENA_RUNTIME_BRAND?.trim().toUpperCase()
-+  || "ATHENA CODE") as AthenaRuntimeBrand
-+
-+export const athenaImmersive = process.env.ATHENA_IMMERSIVE_MODE === "1"
-+
-+export const athenaModeLabel = athenaImmersive ? "IMMERSIVE" : "CLEAN"
-+
-+export const athenaTerminalPrefix =
-+  athenaRuntimeBrand === "ATHENA CODEX" ? "ACX" : athenaRuntimeBrand === "ATHENA CLAUDE" ? "ACL" : "AC"
 diff --git a/packages/tui/src/component/prompt/index.tsx b/packages/tui/src/component/prompt/index.tsx
 index 0a9f103ef..4613af94f 100644
 --- a/packages/tui/src/component/prompt/index.tsx
@@ -315,79 +220,41 @@ index 909dd69ac..00474c3ad 100644
      })
  
      createEffect(() => renderer.setBackgroundColor(values().background))
+diff --git a/packages/tui/src/feature-plugins/builtins.ts b/packages/tui/src/feature-plugins/builtins.ts
+index 46e122d71..03f4bdca8 100644
+--- a/packages/tui/src/feature-plugins/builtins.ts
++++ b/packages/tui/src/feature-plugins/builtins.ts
+@@ -1,4 +1,5 @@
+ import type { TuiPlugin, TuiPluginModule } from "@opencode-ai/plugin/tui"
++import Athena from "./athena"
+ import HomeFooter from "./home/footer"
+ import HomeTips from "./home/tips"
+ import SessionSwitcher from "./session"
+@@ -25,6 +26,7 @@ export function createBuiltinPlugins(options: {
+   experimentalSessionSwitcher: boolean
+ }): BuiltinTuiPlugin[] {
+   return [
++    Athena,
+     HomeFooter,
+     HomeTips,
+     SidebarContext,
 diff --git a/packages/tui/src/feature-plugins/home/footer.tsx b/packages/tui/src/feature-plugins/home/footer.tsx
-index 41bee5da5..04f3a7a68 100644
+index 41bee5da5..651b39a9b 100644
 --- a/packages/tui/src/feature-plugins/home/footer.tsx
 +++ b/packages/tui/src/feature-plugins/home/footer.tsx
-@@ -1,9 +1,12 @@
- import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
- import type { BuiltinTuiPlugin } from "../builtins"
--import { createMemo, Match, Show, Switch } from "solid-js"
-+import { existsSync, readFileSync } from "node:fs"
-+import { join } from "node:path"
-+import { createMemo, createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js"
+@@ -4,6 +4,7 @@ import { createMemo, Match, Show, Switch } from "solid-js"
  import { abbreviateHome } from "../../runtime"
  import { useTuiPaths } from "../../context/runtime"
  import { useHomeSessionDestination } from "../../routes/home/session-destination"
-+import { athenaImmersive, athenaModeLabel, athenaRuntimeBrand } from "../../branding"
++import { AthenaFooterStatus } from "./athena-status"
  
  const id = "internal:home-footer"
  
-@@ -61,6 +64,46 @@ function Version(props: { api: TuiPluginApi }) {
-   )
- }
- 
-+type MemoryStatus = {
-+  loaded?: number
-+  recalled?: number
-+  empty_store?: boolean
-+}
-+
-+function readMemoryStatus(directory: string): MemoryStatus | null {
-+  const file = join(directory, ".context-workspace", "memory", "status.json")
-+  if (!existsSync(file)) return null
-+  try {
-+    return JSON.parse(readFileSync(file, "utf8")) as MemoryStatus
-+  } catch {
-+    return null
-+  }
-+}
-+
-+function formatMemoryStatus(status: MemoryStatus | null): string {
-+  if (!status || status.empty_store) return "memory empty"
-+  return `loaded ${status.loaded ?? 0} memories · recalled ${status.recalled ?? 0} this turn`
-+}
-+
-+function AthenaMemory(props: { api: TuiPluginApi }) {
-+  const paths = useTuiPaths()
-+  const directory = createMemo(() => props.api.state.path.directory || paths.cwd)
-+  const [label, setLabel] = createSignal(formatMemoryStatus(readMemoryStatus(directory())))
-+
-+  onMount(() => {
-+    const refresh = () => setLabel(formatMemoryStatus(readMemoryStatus(directory())))
-+    refresh()
-+    const timer = setInterval(refresh, 1000)
-+    onCleanup(() => clearInterval(timer))
-+  })
-+
-+  return (
-+    <Show when={athenaImmersive}>
-+      <text fg={props.api.theme.current.textMuted}>{label()}</text>
-+    </Show>
-+  )
-+}
-+
- function View(props: { api: TuiPluginApi }) {
-   return (
-     <box
-@@ -75,6 +118,10 @@ function View(props: { api: TuiPluginApi }) {
+@@ -75,6 +76,7 @@ function View(props: { api: TuiPluginApi }) {
      >
        <Directory api={props.api} />
        <Mcp api={props.api} />
-+      <text fg={props.api.theme.current.primary}>
-+        {athenaRuntimeBrand} · {athenaModeLabel}
-+      </text>
-+      <AthenaMemory api={props.api} />
++      <AthenaFooterStatus api={props.api} />
        <box flexGrow={1} />
        <Version api={props.api} />
      </box>

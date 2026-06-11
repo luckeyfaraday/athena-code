@@ -1,19 +1,8 @@
-import { Effect, Schema } from "effect"
-import { InstanceState } from "@/effect/instance-state"
-import * as Tool from "./tool"
+import { tool } from "@opencode-ai/plugin"
 import { readSessionRecall } from "../session/memory/sessionindex"
+import { normalizeWorktree } from "../plugin/workspace"
 
 const KNOWN_AGENTS = ["athena", "claude", "codex", "opencode", "hermes"] as const
-
-export const Parameters = Schema.Struct({
-  query: Schema.String.annotate({
-    description: "Search text for prior session recall. Use specific keywords from the past discussion.",
-  }),
-  agent: Schema.optional(Schema.String).annotate({
-    description:
-      'Optional filter to one agent\'s sessions: "athena", "claude", "codex", "opencode", or "hermes". Omit to search all agents.',
-  }),
-})
 
 function renderSessionRecall(
   params: { query: string; agent?: string },
@@ -74,18 +63,21 @@ function renderSessionRecall(
   }
 }
 
-export const SessionRecallTool = Tool.define(
-  "session_recall",
-  Effect.gen(function* () {
-    return {
-      description:
-        "Search prior coding sessions across all local agents (Athena Code, Claude Code, Codex, opencode, Hermes) and all workspaces. Use when the user asks what was discussed before, references another session or agent, or asks to recover prior work.",
-      parameters: Parameters,
-      execute: (params: { query: string; agent?: string }, context: Tool.Context) =>
-        Effect.gen(function* () {
-          const instance = yield* InstanceState.context
-          return renderSessionRecall(params, instance.worktree, context.sessionID)
-        }),
-    }
-  }),
-)
+export const SessionRecallTool = tool({
+  description:
+    "Search prior coding sessions across all local agents (Athena Code, Claude Code, Codex, opencode, Hermes) and all workspaces. Use when the user asks what was discussed before, references another session or agent, or asks to recover prior work.",
+  args: {
+    query: tool.schema
+      .string()
+      .describe("Search text for prior session recall. Use specific keywords from the past discussion."),
+    agent: tool.schema
+      .string()
+      .optional()
+      .describe(
+        'Optional filter to one agent\'s sessions: "athena", "claude", "codex", "opencode", or "hermes". Omit to search all agents.',
+      ),
+  },
+  async execute(args, context) {
+    return renderSessionRecall(args, normalizeWorktree(context), context.sessionID)
+  },
+})

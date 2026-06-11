@@ -88,13 +88,15 @@ export function DialogAthenaSessions() {
   const options = createMemo((): DialogSelectOption<AthenaSessionEntry>[] => {
     const list = entries()
     if (list.length === 0) {
+      // Not `disabled`: DialogSelect strips disabled options when skipFilter
+      // is set, which would leave the dialog silently empty. Selecting this
+      // row is a no-op because its value is undefined.
       return [
         {
           title: search().trim()
             ? "No sessions match — try different words"
             : "No indexed sessions yet — the index builds in the background as you use your agents",
           value: undefined as unknown as AthenaSessionEntry,
-          disabled: true,
         },
       ]
     }

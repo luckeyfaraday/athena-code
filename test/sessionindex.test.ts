@@ -271,7 +271,7 @@ test("a v1 index is rebuilt on the next write", () => {
   const db = new Database(path, { readonly: true })
   try {
     const version = (db.query("PRAGMA user_version").get() as { user_version: number }).user_version
-    expect(version).toBe(2)
+    expect(version).toBe(3)
   } finally {
     db.close()
   }
@@ -308,4 +308,18 @@ test("last session returns bounded beginning and ending context", () => {
     "turn 6",
     "turn 7",
   ])
+})
+
+test("search keeps one hit per distinct text, preferring the newest copy", () => {
+  const ws = workspace("athsession-")
+  // Hermes-style rolling sessions: the same turn text recurs in newer files.
+  indexMessages(ws, [
+    { sessionId: "roll-old", role: "user", ts: "seq:1", text: "the manifold gateway timeout is four seconds" },
+    { sessionId: "roll-new", role: "user", ts: "seq:1", text: "the manifold gateway timeout is four seconds" },
+    { sessionId: "other", role: "user", ts: "seq:1", text: "the manifold gateway retries twice" },
+  ])
+  const hits = searchSessions(ws, "manifold gateway timeout")
+  const timeoutHits = hits.filter((hit) => hit.text.includes("four seconds"))
+  expect(timeoutHits.length).toBe(1)
+  expect(timeoutHits[0].session_id).toBe("roll-new")
 })

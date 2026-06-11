@@ -310,3 +310,36 @@ test.skipIf(!oracleAvailable)("extraction counts match the sessions-search oracl
   }
   expect(oracle).toEqual(ours)
 })
+
+test("hermes session_*.json snapshots of .jsonl transcripts are not double-indexed", async () => {
+  const base = tmp("athscan-hermes-pair-")
+  const root = join(base, "hermes-sessions")
+  mkdirSync(root, { recursive: true })
+  // Hermes writes this pair for the same conversation.
+  writeFileSync(
+    join(root, "20260603_080000_abc123.jsonl"),
+    jsonl([{ role: "user", content: "inspect the nebular ingest backlog", timestamp: "2026-06-03T08:00:00Z" }]),
+  )
+  writeFileSync(
+    join(root, "session_20260603_080000_abc123.json"),
+    JSON.stringify({ platform: "telegram", messages: [{ role: "user", content: "inspect the nebular ingest backlog" }] }),
+  )
+  // A snapshot with no .jsonl sibling must still be indexed.
+  writeFileSync(
+    join(root, "session_20260603_090000_solo42.json"),
+    JSON.stringify({ platform: "telegram", messages: [{ role: "user", content: "standalone nebular telegram session" }] }),
+  )
+  const stats = statsByAgent(
+    await scanAgentSessions({
+      claude: join(base, "no-claude"),
+      codex: join(base, "no-codex"),
+      hermes: root,
+      opencodeDb: join(base, "no-opencode.db"),
+    }),
+  )
+  expect(stats.hermes).toMatchObject({ scanned: 2, indexed: 2 })
+  const sessions = new Set(searchSessions("", "nebular", 10).map((hit) => hit.session_id))
+  expect(sessions.has("20260603_080000_abc123.jsonl")).toBe(true)
+  expect(sessions.has("session_20260603_080000_abc123.json")).toBe(false)
+  expect(sessions.has("session_20260603_090000_solo42.json")).toBe(true)
+})

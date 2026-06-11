@@ -1,14 +1,6 @@
-import { Effect, Schema } from "effect"
-import { InstanceState } from "@/effect/instance-state"
-import * as Tool from "./tool"
+import { tool } from "@opencode-ai/plugin"
 import { readMemoryFacts } from "../session/memory/actions"
-
-export const Parameters = Schema.Struct({
-  query: Schema.String.annotate({
-    description:
-      "Search text for Athena Code memory. Use an empty string to list recent memories. Do not search for secrets.",
-  }),
-})
+import { normalizeWorktree } from "../plugin/workspace"
 
 function renderMemoryRead(params: { query: string }, workspace: string): {
   title: string
@@ -38,19 +30,17 @@ function renderMemoryRead(params: { query: string }, workspace: string): {
   }
 }
 
-export const MemoryReadTool = Tool.define(
-  "memory_read",
-  Effect.gen(function* () {
-    return {
-      description:
-        "Read global Athena Code memory from the native .athena-code store. Use when the user asks what you remember, asks you to check memory, or when automatic recall may have missed relevant memory.",
-      parameters: Parameters,
-      execute: (params: { query: string }) =>
-        Effect.gen(function* () {
-          const instance = yield* InstanceState.context
-          return renderMemoryRead(params, instance.worktree)
-        }).pipe(Effect.orDie),
-    }
-  }),
-)
-
+export const MemoryReadTool = tool({
+  description:
+    "Read global Athena Code memory from the native .athena-code store. Use when the user asks what you remember, asks you to check memory, or when automatic recall may have missed relevant memory.",
+  args: {
+    query: tool.schema
+      .string()
+      .describe(
+        "Search text for Athena Code memory. Use an empty string to list recent memories. Do not search for secrets.",
+      ),
+  },
+  async execute(args, context) {
+    return renderMemoryRead(args, normalizeWorktree(context))
+  },
+})

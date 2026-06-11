@@ -173,7 +173,7 @@ upstream source tree:
 ```text
 OpenCode pinned revision
         +
-patches/opencode-branding.patch
+patches/opencode-athena.patch
         +
 overlay/packages/opencode/...
         =
