@@ -158,17 +158,20 @@ index b309edcd9..4751cae9c 100644
    sounds: {
      default: defaultSoundPath,
 diff --git a/packages/tui/src/component/prompt/index.tsx b/packages/tui/src/component/prompt/index.tsx
-index 0a9f103ef..4613af94f 100644
+index 0a9f103ef..9d3176251 100644
 --- a/packages/tui/src/component/prompt/index.tsx
 +++ b/packages/tui/src/component/prompt/index.tsx
-@@ -15,6 +15,7 @@ import path from "path"
+@@ -15,8 +15,9 @@ import path from "path"
  import { fileURLToPath } from "url"
  import { useLocal } from "../../context/local"
  import { Flag } from "@opencode-ai/core/flag/flag"
-+import { athenaRuntimeBrand } from "../../branding"
++import { athenaPromptFrame, athenaRuntimeBrand } from "../../branding"
  import { tint, useTheme } from "../../context/theme"
- import { EmptyBorder, SplitBorder } from "../../ui/border"
+-import { EmptyBorder, SplitBorder } from "../../ui/border"
++import { EmptyBorder } from "../../ui/border"
  import { useTuiPaths, useTuiTerminalEnvironment } from "../../context/runtime"
+ import { useClipboard } from "../../context/clipboard"
+ import { Spinner } from "../spinner"
 @@ -205,7 +206,7 @@ export function Prompt(props: PromptProps) {
    const workspace = usePromptWorkspace(props.sessionID)
    const move = usePromptMove({ projectID: project.project, sessionID: () => props.sessionID })
@@ -178,6 +181,39 @@ index 0a9f103ef..4613af94f 100644
    const hasRightContent = createMemo(() => Boolean(props.right))
  
    function promptModelWarning() {
+@@ -1334,12 +1335,9 @@ export function Prompt(props: PromptProps) {
+       <box ref={(r: BoxRenderable) => (anchor = r)} visible={props.visible !== false} width="100%">
+         <box
+           width="100%"
+-          border={["left"]}
++          border={athenaPromptFrame.border}
+           borderColor={borderHighlight()}
+-          customBorderChars={{
+-            ...SplitBorder.customBorderChars,
+-            bottomLeft: "╹",
+-          }}
++          customBorderChars={athenaPromptFrame.chars}
+         >
+           <box
+             paddingLeft={2}
+@@ -1469,7 +1467,7 @@ export function Prompt(props: PromptProps) {
+           borderColor={borderHighlight()}
+           customBorderChars={{
+             ...EmptyBorder,
+-            vertical: theme.backgroundElement.a !== 0 ? "╹" : " ",
++            vertical: " ",
+           }}
+         >
+           <box
+@@ -1480,7 +1478,7 @@ export function Prompt(props: PromptProps) {
+               theme.backgroundElement.a !== 0
+                 ? {
+                     ...EmptyBorder,
+-                    horizontal: "▀",
++                    horizontal: " ",
+                   }
+                 : {
+                     ...EmptyBorder,
 diff --git a/packages/tui/src/context/theme.tsx b/packages/tui/src/context/theme.tsx
 index 909dd69ac..00474c3ad 100644
 --- a/packages/tui/src/context/theme.tsx
@@ -238,26 +274,6 @@ index 46e122d71..03f4bdca8 100644
      HomeFooter,
      HomeTips,
      SidebarContext,
-diff --git a/packages/tui/src/feature-plugins/home/footer.tsx b/packages/tui/src/feature-plugins/home/footer.tsx
-index 41bee5da5..651b39a9b 100644
---- a/packages/tui/src/feature-plugins/home/footer.tsx
-+++ b/packages/tui/src/feature-plugins/home/footer.tsx
-@@ -4,6 +4,7 @@ import { createMemo, Match, Show, Switch } from "solid-js"
- import { abbreviateHome } from "../../runtime"
- import { useTuiPaths } from "../../context/runtime"
- import { useHomeSessionDestination } from "../../routes/home/session-destination"
-+import { AthenaFooterStatus } from "./athena-status"
- 
- const id = "internal:home-footer"
- 
-@@ -75,6 +76,7 @@ function View(props: { api: TuiPluginApi }) {
-     >
-       <Directory api={props.api} />
-       <Mcp api={props.api} />
-+      <AthenaFooterStatus api={props.api} />
-       <box flexGrow={1} />
-       <Version api={props.api} />
-     </box>
 diff --git a/packages/tui/src/logo.ts b/packages/tui/src/logo.ts
 index a58a8cf99..6f40d30d0 100644
 --- a/packages/tui/src/logo.ts
@@ -275,6 +291,19 @@ index a58a8cf99..6f40d30d0 100644
  }
  
  export const go = {
+diff --git a/packages/tui/src/routes/home.tsx b/packages/tui/src/routes/home.tsx
+index d4145e2d8..c07f54fa4 100644
+--- a/packages/tui/src/routes/home.tsx
++++ b/packages/tui/src/routes/home.tsx
+@@ -15,7 +15,7 @@ import { HomeSessionDestinationProvider } from "./home/session-destination"
+ 
+ let once = false
+ const placeholder = {
+-  normal: ["Fix a TODO in the codebase", "What is the tech stack of this project?", "Fix broken tests"],
++  normal: ["Brief me on this codebase", "Survey the failing tests", "Map the tech stack of this project"],
+   shell: ["ls -la", "git status", "pwd"],
+ }
+ 
 diff --git a/packages/tui/src/routes/session/permission.tsx b/packages/tui/src/routes/session/permission.tsx
 index c787a84a8..7962e78aa 100644
 --- a/packages/tui/src/routes/session/permission.tsx

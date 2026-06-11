@@ -1,6 +1,7 @@
 import { TextAttributes } from "@opentui/core"
 import { For, Show, createMemo, createSignal, onCleanup } from "solid-js"
 import { useTheme } from "../context/theme"
+import { markLines } from "../util/athena-identity"
 import { Logo } from "./logo"
 
 // Athena splash — a branded loading screen shown while the TUI plugin host
@@ -19,30 +20,7 @@ const TICKER_FRAMES = BURST_FRAMES + 8 // subtitle + ticker reveal
 const MIN_MS = 900
 const MAX_MS = 8000
 
-// Six spokes of the mark as (row-step, col-step, glyph). Columns step by two
-// so the diagonals read at roughly the right angle given a terminal cell's
-// ~2:1 height:width ratio. The centre cell stays hollow, like the SVG.
-const SPOKES: ReadonlyArray<readonly [number, number, string]> = [
-  [-1, 0, "|"],
-  [1, 0, "|"],
-  [-1, -2, "\\"],
-  [-1, 2, "/"],
-  [1, -2, "/"],
-  [1, 2, "\\"],
-]
 const SPOKE_LEN = 3
-
-function markLines(grown: number): string[] {
-  const rows = 2 * SPOKE_LEN + 1
-  const cols = 4 * SPOKE_LEN + 1
-  const grid = Array.from({ length: rows }, () => Array<string>(cols).fill(" "))
-  for (const [dy, dx, glyph] of SPOKES) {
-    for (let i = 1; i <= grown; i++) {
-      grid[SPOKE_LEN + dy * i][2 * SPOKE_LEN + dx * i] = glyph
-    }
-  }
-  return grid.map((row) => row.join(""))
-}
 
 export function AthenaSplash(props: { ready: () => boolean }) {
   const theme = useTheme().theme
