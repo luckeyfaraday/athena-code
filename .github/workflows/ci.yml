@@ -10,6 +10,27 @@ permissions:
   contents: read
 
 jobs:
+  patch-apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Clone pinned upstream revision (sparse)
+        run: |
+          REVISION="$(sed -n 's/^REVISION="\([0-9a-f]*\)"$/\1/p' scripts/build.sh)"
+          test -n "$REVISION"
+          git clone --filter=blob:none --no-checkout https://github.com/anomalyco/opencode.git /tmp/upstream
+          git -C /tmp/upstream sparse-checkout set packages
+          git -C /tmp/upstream fetch origin "$REVISION"
+          git -C /tmp/upstream checkout --detach "$REVISION"
+
+      - name: Check patches apply to the pinned revision
+        run: |
+          for patch in patches/*.patch; do
+            sed 's/\r$//' "$patch" | git -C /tmp/upstream apply --check -
+            echo "OK: $patch"
+          done
+
   test:
     runs-on: ubuntu-24.04
     steps:

@@ -56,7 +56,7 @@ Athena Code does not vendor the complete OpenCode repository.
 
 - Put Athena-owned source files under `overlay/`.
 - Put changes to existing upstream files in
-  `patches/opencode-branding.patch`.
+  `patches/opencode-athena.patch`.
 - Keep the OpenCode revision pinned in `scripts/build.sh`.
 - Add focused tests under `test/`.
 

@@ -77,11 +77,11 @@ for patch in "$ROOT"/patches/*.patch; do
   sed 's/\r$//' "$patch" | git -C "$SOURCE" apply -
 done
 
-# Overlay Athena-owned native source (memory store + frozen snapshot) on top of
-# the patched checkout. These are maintained as real files under Athena code/
-# rather than as patch hunks; the branding patch only wires them in (e.g. prompt.ts
-# imports ./memory/snapshot). Copy after the patch so the imported files exist
-# before install/build.
+# Overlay Athena-owned native source (memory layer, server plugin, TUI
+# additions) on top of the patched checkout. These are maintained as real files
+# under overlay/ rather than as patch hunks; the patch only wires them in with
+# one-line hunks (e.g. plugin/index.ts registers ./athena as a builtin plugin).
+# Copy after the patch so the imported files exist before install/build.
 cp -R "$ROOT/overlay/." "$SOURCE/"
 
 cd "$SOURCE"

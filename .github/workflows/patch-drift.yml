@@ -1,0 +1,41 @@
+name: Patch drift
+
+# Early warning that upstream OpenCode has drifted under our patches: applies
+# every patch in patches/ against upstream HEAD with `git apply --check`. A
+# failure here does not break releases (builds pin REVISION in
+# scripts/build.sh); it means the next pin bump will need patch regeneration.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Clone upstream HEAD (sparse)
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/anomalyco/opencode.git /tmp/upstream
+          git -C /tmp/upstream sparse-checkout set packages
+          git -C /tmp/upstream checkout
+
+      - name: Check patches against upstream HEAD
+        run: |
+          status=0
+          for patch in patches/*.patch; do
+            echo "::group::$patch"
+            if sed 's/\r$//' "$patch" | git -C /tmp/upstream apply --check -; then
+              echo "OK: $patch applies to upstream HEAD"
+            else
+              echo "::error file=$patch::$patch no longer applies to upstream HEAD ($(git -C /tmp/upstream rev-parse HEAD))"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$status"
