@@ -499,26 +499,38 @@ export async function scanAgentSessions(roots: ScanRoots = defaultScanRoots()): 
   return results
 }
 
-let scanRunning = false
+let scanRunning: Promise<ScanStats[]> | null = null
 let lastScanStarted = 0
 
-// Debounced background entry point for the turn loop: kicks a scan at most
-// once per interval per process and never blocks the calling turn.
-export function scheduleAgentScan(): void {
+export interface ScheduleAgentScanOptions {
+  minIntervalMs?: number
+}
+
+// Debounced background entry point for the turn loop and explicit UI refreshes:
+// kicks a scan at most once per interval per process. Callers may await the
+// returned promise to refresh read-side views after the scan settles.
+export function scheduleAgentScan(options: ScheduleAgentScanOptions = {}): Promise<ScanStats[] | null> {
   const now = Date.now()
-  if (scanRunning || now - lastScanStarted < SCAN_INTERVAL_MS) return
-  scanRunning = true
+  if (scanRunning) return scanRunning
+  if (now - lastScanStarted < (options.minIntervalMs ?? SCAN_INTERVAL_MS)) return Promise.resolve(null)
   lastScanStarted = now
-  setTimeout(() => {
-    scanAgentSessions()
-      .then((results) => {
-        for (const stats of results) {
-          if (stats.error) console.error(`athena-code agent scan (${stats.agent}) failed: ${stats.error}`)
-        }
-      })
-      .catch((error) => console.error("athena-code agent scan failed:", error))
-      .finally(() => {
-        scanRunning = false
-      })
-  }, 0)
+  scanRunning = new Promise<ScanStats[]>((resolve) => {
+    setTimeout(() => {
+      scanAgentSessions()
+        .then((results) => {
+          for (const stats of results) {
+            if (stats.error) console.error(`athena-code agent scan (${stats.agent}) failed: ${stats.error}`)
+          }
+          resolve(results)
+        })
+        .catch((error) => {
+          console.error("athena-code agent scan failed:", error)
+          resolve([])
+        })
+        .finally(() => {
+          scanRunning = null
+        })
+    }, 0)
+  })
+  return scanRunning
 }
