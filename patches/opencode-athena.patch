@@ -52,14 +52,107 @@ index 478114209..0b27a34d5 100644
  import { Effect, Layer, Context } from "effect"
  import { EffectBridge } from "@/effect/bridge"
  import { InstanceState } from "@/effect/instance-state"
-@@ -78,6 +79,7 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
+@@ -78,5 +79,6 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
      AzureAuthPlugin,
      DigitalOceanAuthPlugin,
      XaiAuthPlugin,
 +    AthenaPlugin,
    ]
  }
+diff --git a/packages/tui/src/routes/session/index.tsx b/packages/tui/src/routes/session/index.tsx
+index 7736eb75b..2cbbde8a4 100644
+--- a/packages/tui/src/routes/session/index.tsx
++++ b/packages/tui/src/routes/session/index.tsx
+@@ -1393,11 +1393,13 @@ function UserMessage(props: {
+       <Show when={text()}>
+         <box
+           id={props.message.id}
+-          border={["left"]}
+-          borderColor={color()}
+-          customBorderChars={SplitBorder.customBorderChars}
++          flexDirection="row"
++          gap={1}
+           marginTop={props.index === 0 ? 0 : 1}
+         >
++          <box flexShrink={0} paddingTop={1}>
++            <text fg={color()}>◆</text>
++          </box>
+           <box
+             onMouseOver={() => {
+               setHover(true)
+@@ -1411,6 +1413,7 @@ function UserMessage(props: {
+             paddingLeft={2}
+             backgroundColor={hover() ? theme.backgroundElement : theme.backgroundPanel}
+             flexShrink={0}
++            flexGrow={1}
+           >
+             <text fg={theme.text}>{text()}</text>
+             <Show when={files().length}>
+diff --git a/packages/tui/src/feature-plugins/sidebar/context.tsx b/packages/tui/src/feature-plugins/sidebar/context.tsx
+index f1c99d967..9ccf4e055 100644
+--- a/packages/tui/src/feature-plugins/sidebar/context.tsx
++++ b/packages/tui/src/feature-plugins/sidebar/context.tsx
+@@ -36,7 +36,7 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
  
+   return (
+     <box>
+-      <text fg={theme().text}>
++      <text fg={theme().primary}>
+         <b>Context</b>
+       </text>
+       <text fg={theme().textMuted}>{state().tokens.toLocaleString()} tokens</text>
+diff --git a/packages/tui/src/feature-plugins/sidebar/files.tsx b/packages/tui/src/feature-plugins/sidebar/files.tsx
+index 01f33f647..294c56646 100644
+--- a/packages/tui/src/feature-plugins/sidebar/files.tsx
++++ b/packages/tui/src/feature-plugins/sidebar/files.tsx
+@@ -23,7 +23,7 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
+           <Show when={list().length > 2}>
+             <text fg={theme().text}>{open() ? "▼" : "▶"}</text>
+           </Show>
+-          <text fg={theme().text}>
++          <text fg={theme().primary}>
+             <b>Modified Files</b>
+           </text>
+         </box>
+diff --git a/packages/tui/src/feature-plugins/sidebar/lsp.tsx b/packages/tui/src/feature-plugins/sidebar/lsp.tsx
+index c260cfbd1..0e4321294 100644
+--- a/packages/tui/src/feature-plugins/sidebar/lsp.tsx
++++ b/packages/tui/src/feature-plugins/sidebar/lsp.tsx
+@@ -16,7 +16,7 @@ function View(props: { api: TuiPluginApi }) {
+         <Show when={list().length > 2}>
+           <text fg={theme().text}>{open() ? "▼" : "▶"}</text>
+         </Show>
+-        <text fg={theme().text}>
++        <text fg={theme().primary}>
+           <b>LSP</b>
+         </text>
+       </box>
+diff --git a/packages/tui/src/feature-plugins/sidebar/mcp.tsx b/packages/tui/src/feature-plugins/sidebar/mcp.tsx
+index 99d8567ea..094088230 100644
+--- a/packages/tui/src/feature-plugins/sidebar/mcp.tsx
++++ b/packages/tui/src/feature-plugins/sidebar/mcp.tsx
+@@ -33,7 +33,7 @@ function View(props: { api: TuiPluginApi }) {
+           <Show when={list().length > 2}>
+             <text fg={theme().text}>{open() ? "▼" : "▶"}</text>
+           </Show>
+-          <text fg={theme().text}>
++          <text fg={theme().primary}>
+             <b>MCP</b>
+             <Show when={!open()}>
+               <span style={{ fg: theme().textMuted }}>
+diff --git a/packages/tui/src/feature-plugins/sidebar/todo.tsx b/packages/tui/src/feature-plugins/sidebar/todo.tsx
+index 15a78b0eb..ca4fedcc0 100644
+--- a/packages/tui/src/feature-plugins/sidebar/todo.tsx
++++ b/packages/tui/src/feature-plugins/sidebar/todo.tsx
+@@ -18,7 +18,7 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
+           <Show when={list().length > 2}>
+             <text fg={theme().text}>{open() ? "▼" : "▶"}</text>
+           </Show>
+-          <text fg={theme().text}>
++          <text fg={theme().primary}>
+             <b>Todo</b>
+           </text>
+         </box>
 diff --git a/packages/opencode/src/temporary.ts b/packages/opencode/src/temporary.ts
 index e7abd0dc9..481436b7f 100644
 --- a/packages/opencode/src/temporary.ts
