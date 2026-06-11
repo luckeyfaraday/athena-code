@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin"
 import { readMemoryFacts } from "../session/memory/actions"
+import { normalizeWorktree } from "../plugin/workspace"
 
 function renderMemoryRead(params: { query: string }, workspace: string): {
   title: string
@@ -40,6 +41,6 @@ export const MemoryReadTool = tool({
       ),
   },
   async execute(args, context) {
-    return renderMemoryRead(args, context.worktree)
+    return renderMemoryRead(args, normalizeWorktree(context))
   },
 })

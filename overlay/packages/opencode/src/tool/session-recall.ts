@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin"
 import { readSessionRecall } from "../session/memory/sessionindex"
+import { normalizeWorktree } from "../plugin/workspace"
 
 const KNOWN_AGENTS = ["athena", "claude", "codex", "opencode", "hermes"] as const
 
@@ -77,6 +78,6 @@ export const SessionRecallTool = tool({
       ),
   },
   async execute(args, context) {
-    return renderSessionRecall(args, context.worktree, context.sessionID)
+    return renderSessionRecall(args, normalizeWorktree(context), context.sessionID)
   },
 })

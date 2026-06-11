@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin"
 import { writeMemoryFact } from "../session/memory/actions"
+import { normalizeWorktree } from "../plugin/workspace"
 
 export const MemoryWriteTool = tool({
   description:
@@ -10,7 +11,7 @@ export const MemoryWriteTool = tool({
       .describe("A durable Athena Code fact to remember globally across folders. Do not store secrets."),
   },
   async execute(args, context) {
-    const entry = writeMemoryFact(context.worktree, args.text, "agent")
+    const entry = writeMemoryFact(normalizeWorktree(context), args.text, "agent")
     if (!entry) {
       return {
         title: "Memory unchanged",

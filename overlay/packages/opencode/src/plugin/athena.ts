@@ -7,6 +7,7 @@ import { recallSystemEntry } from "../session/memory/recall"
 import { writeMemoryStatus } from "../session/memory/status"
 import { indexSessionMessages, sessionRecallEntry } from "../session/memory/sessionindex"
 import { scheduleAgentScan } from "../session/memory/agentscan"
+import { normalizeWorktree } from "./workspace"
 
 // Athena Code memory layer, wired through the stock plugin hook API so the
 // upstream session loop needs no patching:
@@ -28,10 +29,7 @@ import { scheduleAgentScan } from "../session/memory/agentscan"
 // the main chat call. The extra memory context in those same-session small
 // calls is harmless.
 export const AthenaPlugin: Plugin = async (input) => {
-  // Non-git projects set worktree to the "/" sentinel (see
-  // project/instance-context.ts); use the project directory so per-workspace
-  // files like .context-workspace/memory/status.json land next to the code.
-  const worktree = input.worktree === "/" ? input.directory : input.worktree
+  const worktree = normalizeWorktree(input)
   scheduleAgentScan()
   const recallQuery = new Map<string, string>()
 
