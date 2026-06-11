@@ -11,6 +11,7 @@ import {
   indexScannedSessions,
 } from "../overlay/packages/opencode/src/session/memory/sessionindex"
 import {
+  archiveStats,
   listRecentSessions,
   resumeCommand,
   searchSessions,
@@ -55,6 +56,16 @@ function seed(ws: string) {
 test("absent index lists as empty", () => {
   expect(listRecentSessions()).toEqual([])
   expect(searchSessions("anything")).toEqual([])
+  expect(archiveStats()).toBeNull()
+})
+
+test("archive stats count distinct sessions, agents, and workspace sessions", () => {
+  const ws = workspace("athtui-")
+  seed(ws)
+  expect(archiveStats(ws)).toEqual({ sessions: 3, agents: 3, workspaceSessions: 2 })
+  // Unknown workspace still reports global counts.
+  expect(archiveStats("/nowhere/at/all")).toMatchObject({ sessions: 3, agents: 3, workspaceSessions: 0 })
+  expect(archiveStats()).toMatchObject({ workspaceSessions: 0 })
 })
 
 test("lists one entry per session, newest timestamped first", () => {

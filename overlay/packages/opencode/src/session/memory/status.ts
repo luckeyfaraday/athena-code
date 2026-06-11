@@ -4,7 +4,6 @@ import { readAllMemoryEntries } from "./store"
 import { recallResult } from "./recall"
 
 export interface MemoryStatus {
-  immersive: boolean
   loaded: number
   recalled: number
   empty_store: boolean
@@ -18,7 +17,6 @@ export function statusPath(workspace: string): string {
 export function computeMemoryStatus(workspace: string, query: string): MemoryStatus {
   const entries = readAllMemoryEntries(workspace)
   return {
-    immersive: process.env.ATHENA_IMMERSIVE_MODE === "1",
     loaded: entries.length,
     recalled: recallResult(workspace, query).count,
     empty_store: entries.length === 0,

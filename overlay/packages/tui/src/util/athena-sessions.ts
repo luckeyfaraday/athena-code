@@ -96,6 +96,42 @@ export function listRecentSessions(limit = 100): AthenaSessionEntry[] {
   }
 }
 
+export interface ArchiveStats {
+  sessions: number
+  agents: number
+  // Sessions indexed from the given workspace directory (0 when unknown).
+  workspaceSessions: number
+}
+
+// Headline numbers for the home screen's command room. Null when the index
+// is absent or unreadable so the caller can omit the line entirely rather
+// than render zeros that look like data.
+export function archiveStats(workspace?: string): ArchiveStats | null {
+  const db = open()
+  if (!db) return null
+  try {
+    const totals = db
+      .query(
+        `SELECT COUNT(DISTINCT agent || ':' || session_id) AS sessions,
+                COUNT(DISTINCT agent) AS agents
+         FROM messages`,
+      )
+      .get() as { sessions: number; agents: number }
+    const workspaceSessions = workspace
+      ? (
+          db
+            .query(`SELECT COUNT(DISTINCT agent || ':' || session_id) AS n FROM messages WHERE workspace = ?`)
+            .get(resolve(workspace)) as { n: number }
+        ).n
+      : 0
+    return { sessions: totals.sessions, agents: totals.agents, workspaceSessions }
+  } catch {
+    return null
+  } finally {
+    db.close()
+  }
+}
+
 // Quote each token as an FTS5 literal and OR them, so user punctuation can
 // never inject FTS operators or cause a syntax error (mirrors sessionindex.ts).
 function matchExpression(query: string): string {
