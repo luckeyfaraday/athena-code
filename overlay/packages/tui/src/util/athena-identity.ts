@@ -138,24 +138,44 @@ export function owlLines(state: OwlState, blink = false, tick = false): string[]
 
 // --- the grand owl -----------------------------------------------------------
 
-// The full perched owl for the home screen when the terminal is tall enough:
-// ear tufts, brow, eyes (the blink rows), beak, folded wings over a feathered
-// chest, tail, perch. Every line is padded to the same width so a centering
-// container cannot shear rows of different parity. Rendered by
-// component/athena-owl.tsx, which lights the face rows brighter than the body.
+// The full perched owl for the home screen when the terminal is tall enough,
+// rendered as dot-density stipple art on braille cells (each char a 2x4 dot
+// grid): ear tufts, the horned-owl brow, eyes, beak, folded wings over a
+// feathered chest, a stippled branch. Baked by scripts/generate-braille-owl.ts
+// (seeded, reproducible) — regenerate there, never hand-edit dots. The two
+// frames differ only in the eye rows: open, or closed to sleepy crescents.
 export const OWL_GRAND_FACE_ROWS: ReadonlyArray<number> = [2, 3]
 
+const OWL_GRAND_OPEN: ReadonlyArray<string> = [
+  "⠀⠀⠀⠀⢳⣠⡀⢀⡀⣀⢀⣀⣀⢀⡀⡤⡔⡜⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⢃⢼⢿⣕⡊⠌⠈⢐⡪⡿⣷⡜⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⢈⠘⢁⣬⡙⠃⠘⢋⣥⡘⠙⡁⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⢠⡕⡻⣿⠟⣻⣾⠿⣿⣷⠴⡇⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⢿⢡⡁⣄⣈⢃⠡⣅⣌⡋⠄⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⡐⢁⠂⠋⢛⠹⠧⠟⠋⠅⠀⠋⠈⢆⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⡒⠁⠂⠂⠀⠀⠀⡔⠀⠄⡀⢠⠸⠿⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⣀⠃⠆⠂⡈⠠⢍⠀⠀⠔⠄⠀⠴⡺⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⢗⢀⡁⠀⠀⢀⠮⠀⠀⠇⠀⠐⡖⡾⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⢣⣃⠌⠁⢀⠀⠂⠀⠠⠀⢁⡏⠁⠀⠀⠀⠀",
+  "⠀⣀⠀⢀⣀⣀⣉⣸⣦⣮⢀⡀⣲⣶⣖⣋⡀⣀⢀⣀⣀⠀",
+  "⠀⠐⠈⠀⠈⠀⠁⠀⠈⠑⠀⠐⠐⠀⠀⠐⠀⠈⠈⠐⠀⠀",
+]
+
+const OWL_GRAND_BLINK: ReadonlyArray<string> = [
+  "⠀⠀⠀⠀⢳⣠⡀⢀⡀⣀⢀⣀⣀⢀⡀⡤⡔⡜⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⢃⢼⢿⣕⡊⠌⠈⢐⡪⡿⣷⡜⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⢈⠘⠁⠈⠙⠃⠘⠋⠁⠘⠙⡁⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⢠⡕⣤⣶⡟⣻⣾⢶⣿⣶⠴⡇⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⢿⢡⡁⣄⣈⢃⠡⣅⣌⡋⠄⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⡐⢁⠂⠋⢛⠹⠧⠟⠋⠅⠀⠋⠈⢆⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⡒⠁⠂⠂⠀⠀⠀⡔⠀⠄⡀⢠⠸⠿⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⣀⠃⠆⠂⡈⠠⢍⠀⠀⠔⠄⠀⠴⡺⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⢗⢀⡁⠀⠀⢀⠮⠀⠀⠇⠀⠐⡖⡾⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⢣⣃⠌⠁⢀⠀⠂⠀⠠⠀⢁⡏⠁⠀⠀⠀⠀",
+  "⠀⣀⠀⢀⣀⣀⣉⣸⣦⣮⢀⡀⣲⣶⣖⣋⡀⣀⢀⣀⣀⠀",
+  "⠀⠐⠈⠀⠈⠀⠁⠀⠈⠑⠀⠐⠐⠀⠀⠐⠀⠈⠈⠐⠀⠀",
+]
+
 export function owlGrandLines(blink = false): string[] {
-  const eyes = blink ? "( -   - )" : "( o   o )"
-  return [
-    "  ,_,   ,_,  ",
-    "  \\ \\___/ /  ",
-    `  ${eyes}  `,
-    "   (  v  )   ",
-    "  /|`---'|\\  ",
-    " ( |^ ^ ^| ) ",
-    "  \\|^ ^ ^|/  ",
-    "    |___|    ",
-    `   -"---"-   `,
-  ]
+  return [...(blink ? OWL_GRAND_BLINK : OWL_GRAND_OPEN)]
 }
