@@ -1,14 +1,13 @@
 // The command room — the home screen's identity block under the prompt
-// (docs/ui-identity-design.md): a few lines of true numbers, the owl, and
-// the day's maxim. Every data line is real (cross-agent session index, git
-// branch); lines without data are omitted rather than rendered as zeros.
-// The memory status line is NOT repeated here — it already lives in the
-// home footer (athena-status.tsx).
+// (docs/ui-identity-design.md): a few lines of true numbers and the day's
+// maxim. Every data line is real (cross-agent session index, git branch);
+// lines without data are omitted rather than rendered as zeros. The owl lives
+// in the masthead above the prompt (athena-home-hero.tsx), and the memory
+// status line in the home footer (athena-status.tsx) — neither repeats here.
 
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { useTuiPaths } from "../../context/runtime"
-import { AthenaOwl } from "../../component/athena-owl"
 import { archiveStats, type ArchiveStats } from "../../util/athena-sessions"
 import { dailyAphorism } from "../../util/athena-identity"
 
@@ -58,24 +57,23 @@ export function AthenaCommandRoom(props: { api: TuiPluginApi }) {
 
   return (
     <box width="100%" alignItems="center" paddingTop={2} flexShrink={1}>
-      <box flexDirection="column" gap={0}>
-        <For each={rows()}>
-          {(row) => (
-            <text wrapMode="none">
-              <span style={{ fg: theme().textMuted }}>{row.label.padEnd(labelWidth() + 3)}</span>
-              <span style={{ fg: theme().text }}>{row.value}</span>
-            </text>
-          )}
-        </For>
+      <box flexDirection="column" alignItems="center" gap={0}>
+        <box flexDirection="column">
+          <For each={rows()}>
+            {(row) => (
+              <text wrapMode="none">
+                <span style={{ fg: theme().textMuted }}>{row.label.padEnd(labelWidth() + 3)}</span>
+                <span style={{ fg: theme().text }}>{row.value}</span>
+              </text>
+            )}
+          </For>
+        </box>
         <Show when={rows().length > 0}>
           <text> </text>
         </Show>
-        <box flexDirection="row" gap={2} alignItems="center">
-          <AthenaOwl state={() => "idle"} color={theme().textMuted} faceColor={theme().text} />
-          <text fg={theme().textMuted} wrapMode="none">
-            “{maxim.text}” — {maxim.source}
-          </text>
-        </box>
+        <text fg={theme().textMuted} wrapMode="none">
+          “{maxim.text}” — {maxim.source}
+        </text>
       </box>
     </box>
   )

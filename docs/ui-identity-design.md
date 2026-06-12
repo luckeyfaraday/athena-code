@@ -158,25 +158,34 @@ unreliable.)
 | 1b | Prompt placeholder voice ("Brief me on this codebase", …) | branding string-swap hunk in `routes/home.tsx` | one swap hunk | done 2026-06-11 |
 | 1c | Prompt frame: full thin border with ◆ corners replaces the thick left bar + ▀ panel fade (the most opencode-identifying shape) | `athenaPromptFrame` in overlay `branding.ts`; glyph-swap hunks in `component/prompt/index.tsx` | small swap hunks | done 2026-06-11 |
 | 1c | Owl v2: four lines — ear tufts, face (rendered brighter), wing tick, perch | `util/athena-identity.ts` + `component/athena-owl.tsx` | none | done 2026-06-11 |
-| 2 | Owl accompanying the working state | feature plugin component (`component/athena-owl.tsx` exists) | none–low | |
+| 1d | Sidebar removed entirely: the session sidebar was the most opencode-shaped surface left; the conversation gets the full width and the command room owns identity/status | `sidebarVisible` pinned false + toggle command removed in `routes/session/index.tsx`; sidebar slot registrations and `athena-sidebar.tsx` deleted; old sidebar color hunks reverted | net negative | done 2026-06-12 |
+| 1d | The weave: working animation — a gold shuttle (◆) carrying the weft across the warp replaces the upstream knight-rider scanner; animations-off fallback shows a static `◆╌╌` | `weaveFrames` in `util/athena-identity.ts` + `util/athena-weave.ts`; swap hunks in `component/prompt/index.tsx` (net negative) | small swap hunks | done 2026-06-12 |
+| 1d | The grand owl: a 30×16-cell braille stipple owl (dot-density art — tufts, heavy brow, resting crescent eyes that rarely open in an alert glance, long folded wing, tail hanging past a diagonal branch) joins the command room on terminals ≥50 rows; companion owl below that. Frames baked from `scripts/generate-braille-owl.ts` (seeded, reproducible — regenerate, never hand-edit) | `owlGrandLines` + `AthenaGrandOwl`; height gate in `home/athena-command-room.tsx` | none | done 2026-06-12 |
+| 1d | Meander texture, overlay spots: Greek-key rule under the home hero and on the splash | `meanderLine` in `util/athena-identity.ts` | none | done 2026-06-12 |
 | 2 | The ledger (end-of-session summary + `/ledger`) | feature plugin + existing command registration pattern | none | |
 | 3 | Laurels (milestone store under `.context-workspace`, footer moment) | feature plugin + small persistence | none | |
-| 3 | Meander texture in the three fixed locations | component-level, may touch upstream dialog chrome | medium — audit first | |
+| 3 | Meander texture in upstream dialog chrome (e.g. dialog title rules) | component-level, may touch upstream dialog chrome | medium — audit first | |
 
 Phase 1 is mostly assembling data we already have; it changes the felt
 identity more per line of code than anything else.
 
 Phase 1 findings: the TUI plugin slot map (`TuiHostSlotMap` in
 `packages/plugin/src/tui.ts`) covers `home_logo`, `home_bottom`,
-`home_footer`, `session_prompt_right`, and the sidebar — everything Phase
-1–3 needs registers from `feature-plugins/athena.tsx` with zero new patch
-hunks. The one place flavor cannot reach without a hunk is the hardcoded
-"Thinking" label in upstream `routes/session/index.tsx` (`ReasoningHeader`);
+`home_footer`, and `session_prompt_right` — everything Phase 1–3 needs
+registers from `feature-plugins/athena.tsx` with zero new patch hunks. (The
+sidebar slots existed too, but the sidebar itself was removed in 1d.) The
+one place flavor cannot reach without a hunk is the hardcoded "Thinking"
+label in upstream `routes/session/index.tsx` (`ReasoningHeader`);
 deliberately deferred — "Thinking" is honest and serious as-is.
+
+Phase 1d findings: the upstream working spinner is a knight-rider scanner
+(`ui/spinner.ts` `createFrames`), instantly recognizable as opencode; the
+weave replaces it at the one call site (`component/prompt/index.tsx`
+`spinnerDef`) and is the second signature animation after the splash bloom.
+The owl never accompanies the working state — the weave plus the working
+verb carry it; the owl stays on the idle home screen where it belongs.
 
 ## Open questions
 
-1. Owl placement in working state: corner of the editor area vs. inline
-   with the status line — needs a quick prototype to judge distraction.
-2. Aphorism set: 10 real, attributed maxims shipped in
+1. Aphorism set: 10 real, attributed maxims shipped in
    `util/athena-identity.ts`; grow the set over time, keep attribution.

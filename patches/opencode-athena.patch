@@ -52,107 +52,14 @@ index 478114209..0b27a34d5 100644
  import { Effect, Layer, Context } from "effect"
  import { EffectBridge } from "@/effect/bridge"
  import { InstanceState } from "@/effect/instance-state"
-@@ -78,5 +79,6 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
+@@ -78,6 +79,7 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
      AzureAuthPlugin,
      DigitalOceanAuthPlugin,
      XaiAuthPlugin,
 +    AthenaPlugin,
    ]
  }
-diff --git a/packages/tui/src/routes/session/index.tsx b/packages/tui/src/routes/session/index.tsx
-index 7736eb75b..2cbbde8a4 100644
---- a/packages/tui/src/routes/session/index.tsx
-+++ b/packages/tui/src/routes/session/index.tsx
-@@ -1393,11 +1393,13 @@ function UserMessage(props: {
-       <Show when={text()}>
-         <box
-           id={props.message.id}
--          border={["left"]}
--          borderColor={color()}
--          customBorderChars={SplitBorder.customBorderChars}
-+          flexDirection="row"
-+          gap={1}
-           marginTop={props.index === 0 ? 0 : 1}
-         >
-+          <box flexShrink={0} paddingTop={1}>
-+            <text fg={color()}>◆</text>
-+          </box>
-           <box
-             onMouseOver={() => {
-               setHover(true)
-@@ -1411,6 +1413,7 @@ function UserMessage(props: {
-             paddingLeft={2}
-             backgroundColor={hover() ? theme.backgroundElement : theme.backgroundPanel}
-             flexShrink={0}
-+            flexGrow={1}
-           >
-             <text fg={theme.text}>{text()}</text>
-             <Show when={files().length}>
-diff --git a/packages/tui/src/feature-plugins/sidebar/context.tsx b/packages/tui/src/feature-plugins/sidebar/context.tsx
-index f1c99d967..9ccf4e055 100644
---- a/packages/tui/src/feature-plugins/sidebar/context.tsx
-+++ b/packages/tui/src/feature-plugins/sidebar/context.tsx
-@@ -36,7 +36,7 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
  
-   return (
-     <box>
--      <text fg={theme().text}>
-+      <text fg={theme().primary}>
-         <b>Context</b>
-       </text>
-       <text fg={theme().textMuted}>{state().tokens.toLocaleString()} tokens</text>
-diff --git a/packages/tui/src/feature-plugins/sidebar/files.tsx b/packages/tui/src/feature-plugins/sidebar/files.tsx
-index 01f33f647..294c56646 100644
---- a/packages/tui/src/feature-plugins/sidebar/files.tsx
-+++ b/packages/tui/src/feature-plugins/sidebar/files.tsx
-@@ -23,7 +23,7 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
-           <Show when={list().length > 2}>
-             <text fg={theme().text}>{open() ? "▼" : "▶"}</text>
-           </Show>
--          <text fg={theme().text}>
-+          <text fg={theme().primary}>
-             <b>Modified Files</b>
-           </text>
-         </box>
-diff --git a/packages/tui/src/feature-plugins/sidebar/lsp.tsx b/packages/tui/src/feature-plugins/sidebar/lsp.tsx
-index c260cfbd1..0e4321294 100644
---- a/packages/tui/src/feature-plugins/sidebar/lsp.tsx
-+++ b/packages/tui/src/feature-plugins/sidebar/lsp.tsx
-@@ -16,7 +16,7 @@ function View(props: { api: TuiPluginApi }) {
-         <Show when={list().length > 2}>
-           <text fg={theme().text}>{open() ? "▼" : "▶"}</text>
-         </Show>
--        <text fg={theme().text}>
-+        <text fg={theme().primary}>
-           <b>LSP</b>
-         </text>
-       </box>
-diff --git a/packages/tui/src/feature-plugins/sidebar/mcp.tsx b/packages/tui/src/feature-plugins/sidebar/mcp.tsx
-index 99d8567ea..094088230 100644
---- a/packages/tui/src/feature-plugins/sidebar/mcp.tsx
-+++ b/packages/tui/src/feature-plugins/sidebar/mcp.tsx
-@@ -33,7 +33,7 @@ function View(props: { api: TuiPluginApi }) {
-           <Show when={list().length > 2}>
-             <text fg={theme().text}>{open() ? "▼" : "▶"}</text>
-           </Show>
--          <text fg={theme().text}>
-+          <text fg={theme().primary}>
-             <b>MCP</b>
-             <Show when={!open()}>
-               <span style={{ fg: theme().textMuted }}>
-diff --git a/packages/tui/src/feature-plugins/sidebar/todo.tsx b/packages/tui/src/feature-plugins/sidebar/todo.tsx
-index 15a78b0eb..ca4fedcc0 100644
---- a/packages/tui/src/feature-plugins/sidebar/todo.tsx
-+++ b/packages/tui/src/feature-plugins/sidebar/todo.tsx
-@@ -18,7 +18,7 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
-           <Show when={list().length > 2}>
-             <text fg={theme().text}>{open() ? "▼" : "▶"}</text>
-           </Show>
--          <text fg={theme().text}>
-+          <text fg={theme().primary}>
-             <b>Todo</b>
-           </text>
-         </box>
 diff --git a/packages/opencode/src/temporary.ts b/packages/opencode/src/temporary.ts
 index e7abd0dc9..481436b7f 100644
 --- a/packages/opencode/src/temporary.ts
@@ -171,7 +78,7 @@ index e7abd0dc9..481436b7f 100644
 +  .command(MemoryCommand)
    .parse()
 diff --git a/packages/tui/src/app.tsx b/packages/tui/src/app.tsx
-index ec1fe4d7d..2d8df3866 100644
+index ec1fe4d7d..078efed48 100644
 --- a/packages/tui/src/app.tsx
 +++ b/packages/tui/src/app.tsx
 @@ -4,6 +4,7 @@ import { Deferred, Effect } from "effect"
@@ -182,15 +89,6 @@ index ec1fe4d7d..2d8df3866 100644
  import { ClipboardProvider, useClipboard } from "./context/clipboard"
  import { EpilogueProvider } from "./context/epilogue"
  import * as Selection from "./util/selection"
-@@ -31,7 +32,7 @@ import { ProjectProvider, useProject } from "./context/project"
- import { EditorContextProvider } from "./context/editor"
- import { useEvent } from "./context/event"
- import { SDKProvider, useSDK } from "./context/sdk"
--import { StartupLoading } from "./component/startup-loading"
-+import { AthenaSplash } from "./component/athena-splash"
- import { SyncProvider, useSync } from "./context/sync"
- import { SyncProviderV2 } from "./context/sync-v2"
- import { LocalProvider, useLocal } from "./context/local"
 @@ -420,24 +421,24 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
      if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
  
@@ -220,15 +118,6 @@ index ec1fe4d7d..2d8df3866 100644
      }
    })
  
-@@ -1074,7 +1075,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
-         <pluginRuntime.Slot name="app" />
-       </Show>
-       <Show when={!startup.skipInitialLoading}>
--        <StartupLoading ready={ready} />
-+        <AthenaSplash ready={ready} />
-       </Show>
-     </box>
-   )
 diff --git a/packages/tui/src/attention.ts b/packages/tui/src/attention.ts
 index b309edcd9..4751cae9c 100644
 --- a/packages/tui/src/attention.ts
@@ -251,7 +140,7 @@ index b309edcd9..4751cae9c 100644
    sounds: {
      default: defaultSoundPath,
 diff --git a/packages/tui/src/component/prompt/index.tsx b/packages/tui/src/component/prompt/index.tsx
-index 0a9f103ef..9d3176251 100644
+index 0a9f103ef..6f7883cb9 100644
 --- a/packages/tui/src/component/prompt/index.tsx
 +++ b/packages/tui/src/component/prompt/index.tsx
 @@ -15,8 +15,9 @@ import path from "path"
@@ -265,6 +154,15 @@ index 0a9f103ef..9d3176251 100644
  import { useTuiPaths, useTuiTerminalEnvironment } from "../../context/runtime"
  import { useClipboard } from "../../context/clipboard"
  import { Spinner } from "../spinner"
+@@ -41,7 +42,7 @@ import type { AssistantMessage, FilePart, UserMessage } from "@opencode-ai/sdk/v
+ import { Locale } from "../../util/locale"
+ import { errorMessage } from "../../util/error"
+ import { formatDuration } from "../../util/format"
+-import { createColors, createFrames } from "../../ui/spinner"
++import { weaveSpinner } from "../../util/athena-weave"
+ import { useDialog } from "../../ui/dialog"
+ import { DialogProvider as DialogProviderConnect } from "../dialog-provider"
+ import { DialogAlert } from "../../ui/dialog-alert"
 @@ -205,7 +206,7 @@ export function Prompt(props: PromptProps) {
    const workspace = usePromptWorkspace(props.sessionID)
    const move = usePromptMove({ projectID: project.project, sessionID: () => props.sessionID })
@@ -274,7 +172,31 @@ index 0a9f103ef..9d3176251 100644
    const hasRightContent = createMemo(() => Boolean(props.right))
  
    function promptModelWarning() {
-@@ -1334,12 +1335,9 @@ export function Prompt(props: PromptProps) {
+@@ -1309,22 +1310,7 @@ export function Prompt(props: PromptProps) {
+         ? (local.agent.list().find((a) => a.name === lastUserMessage()?.agent) ?? local.agent.current())
+         : local.agent.current()
+     const color = agent ? local.agent.color(agent.name) : theme.border
+-    return {
+-      frames: createFrames({
+-        color,
+-        style: "blocks",
+-        inactiveFactor: 0.6,
+-        // enableFading: false,
+-        minAlpha: 0.3,
+-      }),
+-      color: createColors({
+-        color,
+-        style: "blocks",
+-        inactiveFactor: 0.6,
+-        // enableFading: false,
+-        minAlpha: 0.3,
+-      }),
+-    }
++    return weaveSpinner(color)
+   })
+   const maxHeight = createMemo(() => tuiConfig.prompt?.max_height ?? Math.max(6, Math.floor(dimensions().height / 3)))
+   const moveLabelWidth = createMemo(() => Math.max(12, Math.min(44, dimensions().width - 48)))
+@@ -1334,12 +1320,9 @@ export function Prompt(props: PromptProps) {
        <box ref={(r: BoxRenderable) => (anchor = r)} visible={props.visible !== false} width="100%">
          <box
            width="100%"
@@ -289,7 +211,7 @@ index 0a9f103ef..9d3176251 100644
          >
            <box
              paddingLeft={2}
-@@ -1469,7 +1467,7 @@ export function Prompt(props: PromptProps) {
+@@ -1469,7 +1452,7 @@ export function Prompt(props: PromptProps) {
            borderColor={borderHighlight()}
            customBorderChars={{
              ...EmptyBorder,
@@ -298,7 +220,7 @@ index 0a9f103ef..9d3176251 100644
            }}
          >
            <box
-@@ -1480,7 +1478,7 @@ export function Prompt(props: PromptProps) {
+@@ -1480,7 +1463,7 @@ export function Prompt(props: PromptProps) {
                theme.backgroundElement.a !== 0
                  ? {
                      ...EmptyBorder,
@@ -307,6 +229,17 @@ index 0a9f103ef..9d3176251 100644
                    }
                  : {
                      ...EmptyBorder,
+@@ -1500,8 +1483,8 @@ export function Prompt(props: PromptProps) {
+               >
+                 <box flexShrink={0} flexDirection="row" gap={1}>
+                   <box marginLeft={1}>
+-                    <Show when={kv.get("animations_enabled", true)} fallback={<text fg={theme.textMuted}>[⋯]</text>}>
+-                      <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
++                    <Show when={kv.get("animations_enabled", true)} fallback={<text fg={theme.textMuted}>◆╌╌</text>}>
++                      <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={spinnerDef().interval} />
+                     </Show>
+                   </box>
+                   <box flexDirection="row" gap={1} flexShrink={0}>
 diff --git a/packages/tui/src/context/theme.tsx b/packages/tui/src/context/theme.tsx
 index 909dd69ac..00474c3ad 100644
 --- a/packages/tui/src/context/theme.tsx
@@ -397,6 +330,93 @@ index d4145e2d8..c07f54fa4 100644
    shell: ["ls -la", "git status", "pwd"],
  }
  
+diff --git a/packages/tui/src/routes/session/index.tsx b/packages/tui/src/routes/session/index.tsx
+index 7736eb75b..c51aec235 100644
+--- a/packages/tui/src/routes/session/index.tsx
++++ b/packages/tui/src/routes/session/index.tsx
+@@ -1,5 +1,4 @@
+ import {
+-  batch,
+   createContext,
+   createEffect,
+   createMemo,
+@@ -119,7 +118,6 @@ const sessionBindingCommands = [
+   "session.unshare",
+   "session.undo",
+   "session.redo",
+-  "session.sidebar.toggle",
+   "session.toggle.conceal",
+   "session.toggle.timestamps",
+   "session.toggle.thinking",
+@@ -246,8 +244,6 @@ export function Session() {
+   })
+ 
+   const dimensions = useTerminalDimensions()
+-  const [sidebar, setSidebar] = kv.signal<"auto" | "hide">("sidebar", "auto")
+-  const [sidebarOpen, setSidebarOpen] = createSignal(false)
+   const [conceal, setConceal] = createSignal(true)
+   const thinking = useThinkingMode()
+   const thinkingMode = thinking.mode
+@@ -261,12 +257,8 @@ export function Session() {
+   const [showGenericToolOutput, setShowGenericToolOutput] = kv.signal("generic_tool_output_visibility", false)
+ 
+   const wide = createMemo(() => dimensions().width > 120)
+-  const sidebarVisible = createMemo(() => {
+-    if (session()?.parentID) return false
+-    if (sidebarOpen()) return true
+-    if (sidebar() === "auto" && wide()) return true
+-    return false
+-  })
++  // Athena: no session sidebar — the conversation gets the full width.
++  const sidebarVisible = createMemo(() => false)
+   const showTimestamps = createMemo(() => timestamps() === "show")
+   const contentWidth = createMemo(() => dimensions().width - (sidebarVisible() ? 42 : 0) - 4)
+   const providers = createMemo(() => Model.index(sync.data.provider))
+@@ -663,19 +655,6 @@ export function Session() {
+         })
+       },
+     },
+-    {
+-      title: sidebarVisible() ? "Hide sidebar" : "Show sidebar",
+-      value: "session.sidebar.toggle",
+-      category: "Session",
+-      run: () => {
+-        batch(() => {
+-          const isVisible = sidebarVisible()
+-          setSidebar(() => (isVisible ? "hide" : "auto"))
+-          setSidebarOpen(!isVisible)
+-        })
+-        dialog.clear()
+-      },
+-    },
+     {
+       title: conceal() ? "Disable code concealment" : "Enable code concealment",
+       value: "session.toggle.conceal",
+@@ -1393,11 +1372,13 @@ function UserMessage(props: {
+       <Show when={text()}>
+         <box
+           id={props.message.id}
+-          border={["left"]}
+-          borderColor={color()}
+-          customBorderChars={SplitBorder.customBorderChars}
++          flexDirection="row"
++          gap={1}
+           marginTop={props.index === 0 ? 0 : 1}
+         >
++          <box flexShrink={0} paddingTop={1}>
++            <text fg={color()}>◆</text>
++          </box>
+           <box
+             onMouseOver={() => {
+               setHover(true)
+@@ -1411,6 +1392,7 @@ function UserMessage(props: {
+             paddingLeft={2}
+             backgroundColor={hover() ? theme.backgroundElement : theme.backgroundPanel}
+             flexShrink={0}
++            flexGrow={1}
+           >
+             <text fg={theme.text}>{text()}</text>
+             <Show when={files().length}>
 diff --git a/packages/tui/src/routes/session/permission.tsx b/packages/tui/src/routes/session/permission.tsx
 index c787a84a8..7962e78aa 100644
 --- a/packages/tui/src/routes/session/permission.tsx
