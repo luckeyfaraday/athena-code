@@ -13,6 +13,7 @@ import {
 import {
   archiveStats,
   listRecentSessions,
+  refreshSessionIndex,
   resumeCommand,
   searchSessions,
 } from "../overlay/packages/tui/src/util/athena-sessions"
@@ -126,6 +127,27 @@ test("a vanished workspace falls back to the current directory", () => {
   const cmd = resumeCommand({ agent: "claude", sessionId: "c1", workspace: gone, updated: null, turns: 1, title: "t" })
   expect(cmd?.cwd).toBe(process.cwd())
   expect(cmd?.argv).toEqual(["claude", "--resume", "c1"])
+})
+
+// refreshSessionIndex reaches the opencode-side scanner through a dynamic
+// import; cover that path plus the started/throttled boolean the dialog uses
+// to decide whether to repaint.
+test("refreshSessionIndex reports whether a scan ran", async () => {
+  const base = workspace("athtui-scan-")
+  process.env.ATHENA_SCAN_CLAUDE_DIR = join(base, "claude")
+  process.env.ATHENA_SCAN_CODEX_DIR = join(base, "codex")
+  process.env.ATHENA_SCAN_HERMES_DIR = join(base, "hermes")
+  process.env.ATHENA_SCAN_OPENCODE_DB = join(base, "opencode.db")
+  try {
+    expect(await refreshSessionIndex(0)).toBe(true)
+    // Immediately after a scan, a throttled refresh is a no-op.
+    expect(await refreshSessionIndex(Number.MAX_SAFE_INTEGER)).toBe(false)
+  } finally {
+    delete process.env.ATHENA_SCAN_CLAUDE_DIR
+    delete process.env.ATHENA_SCAN_CODEX_DIR
+    delete process.env.ATHENA_SCAN_HERMES_DIR
+    delete process.env.ATHENA_SCAN_OPENCODE_DB
+  }
 })
 
 test("search collapses identical snippets from rolling sessions to the newest", () => {
