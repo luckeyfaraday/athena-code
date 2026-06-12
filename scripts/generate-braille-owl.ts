@@ -1,22 +1,22 @@
-// Design-time generator for the grand owl's braille stipple frames
+// Design-time generator for the owl's braille stipple frames
 // (docs/ui-identity-design.md). Run with: npx bun scripts/generate-braille-owl.ts
 //
-// Renders a great horned owl as dot-density stipple art on a braille canvas
-// (each terminal cell is a 2x4 dot grid), after the classic pointillist owl
-// illustrations: no hard outline — shape comes from density alone — a tall
-// slender body with a long folded wing, chest streaks, pointed ear tufts, a
-// heavy brow over sleepy crescent eyes, perched on a diagonal branch. The
-// resting frame has the eyes closed to crescents; the alternate frame opens
-// them — the owl glancing up at you — and is shown by the component on the
-// same rare randomized timer the companion owl blinks on.
+// Renders the Athena owl as dot-density stipple art on braille cells (each
+// terminal cell is a 2x4 dot grid): the perched masthead owl — ear tufts, a
+// heavy brow over the eyes, talons on a branch — and the matching flight
+// sprite for the startup swoop. The perched owl is sized to the flight sprite
+// (12 cells wide) so the landing reads as the same bird folding its wings.
+// The resting frame has sleepy crescent eyes; the alternate frame opens them
+// — the owl glancing up at you — and is shown by the component on a rare
+// randomized timer (and right after landing).
 //
 // The output frames are baked into util/athena-identity.ts as
-// OWL_GRAND_RESTING / OWL_GRAND_ALERT — the stipple is sampled from a seeded
-// PRNG so a rerun reproduces the committed art exactly; tweak the densities
-// here, rerun, and re-bake to iterate.
+// OWL_PERCHED_RESTING / OWL_PERCHED_ALERT / OWL_FLIGHT_FRAMES — the stipple
+// is sampled from a seeded PRNG so a rerun reproduces the committed art
+// exactly; tweak the densities here, rerun, and re-bake to iterate.
 
-const W = 60 // dot columns  (W/2 = 30 terminal columns)
-const H = 64 // dot rows     (H/4 = 16 terminal rows)
+const W = 24 // dot columns  (W/2 = 12 terminal columns)
+const H = 24 // dot rows     (H/4 = 6 terminal rows)
 
 // mulberry32 — tiny seeded PRNG so the art is reproducible.
 function prng(seed: number) {
@@ -60,74 +60,56 @@ function segDist(x: number, y: number, a: number[], b: number[]) {
 function density(x: number, y: number, alert: boolean): number {
   let d = 0
 
-  // --- silhouette: head, tall body, tail — form from edge-weighted density --
-  const head = ell(x, y, 30, 13, 17, 11)
-  const body = ell(x, y, 30, 35, 19, 18)
-  const tail = ell(x, y, 31, 53, 10, 8.5)
-  const tuftL = inTriangle(x, y, [14, 9.5], [23, 4], [9, 0])
-  const tuftR = inTriangle(x, y, [46, 9.5], [37, 4], [51, 0])
-  const inside = head < 1 || body < 1 || tail < 1 || tuftL || tuftR
+  // --- silhouette: head over a round body, form from edge-weighted density --
+  const head = ell(x, y, 12, 8, 8, 5.5)
+  const body = ell(x, y, 12, 16, 8.5, 6.5)
+  const tuftL = inTriangle(x, y, [4.5, 5], [9.5, 5], [7, 0.5])
+  const tuftR = inTriangle(x, y, [19.5, 5], [14.5, 5], [17, 0.5])
+  const inside = head < 1 || body < 1 || tuftL || tuftR
 
   if (inside) {
     // sparse interior, quietest inside the face so the eyes carry it
-    d = head < 0.9 ? 0.05 : 0.12
+    d = head < 0.85 ? 0.04 : 0.2
     const shapes: Array<[number, number]> = [
-      [head, 12],
-      [body, 18.5],
-      [tail, 9],
+      [head, 6.5],
+      [body, 7.5],
     ]
     for (const [sd, r] of shapes) {
       const edge = Math.abs(sd - 1) * r
-      if (edge < 3) {
+      if (edge < 1.6) {
         // skip internal seams where one shape's edge is buried in another
-        const buried =
-          (sd === head && body < 0.9) || (sd === body && (head < 0.9 || tail < 0.85)) || (sd === tail && body < 0.85)
-        if (!buried) d = Math.max(d, 0.85 * (1 - edge / 3.5))
+        const buried = (sd === head && body < 0.9) || (sd === body && head < 0.9)
+        if (!buried) d = Math.max(d, 0.95 * (1 - edge / 2.6))
       }
     }
-    if (tuftL || tuftR) d = Math.max(d, 0.55)
-
-    // the long folded wing down the owl's right flank, with feather edges
-    if (body < 1 && x > 37 && y > 22 && y < 50) {
-      d = Math.max(d, 0.18)
-      const phase = (x - 37 - (y - 22) * 0.35) % 5.5
-      if (phase >= 0 && phase < 1.1) d = Math.max(d, 0.5)
-    }
-
-    // chest: faint vertical feather streaks on the owl's left
-    if (body < 0.85 && x <= 37 && y > 23 && y < 48) {
-      const streak = Math.pow(Math.abs(Math.sin((x / W) * Math.PI * 10)), 8)
-      d = Math.max(d, 0.04 + 0.28 * streak)
-    }
+    if (tuftL || tuftR) d = Math.max(d, 0.8)
   }
 
   // --- the face -------------------------------------------------------------
   // heavy brow: a wide V from the tuft bases down between the eyes
-  if (segDist(x, y, [17, 7.5], [26.5, 11.5]) < 1.2) d = Math.max(d, 0.9)
-  if (segDist(x, y, [43, 7.5], [33.5, 11.5]) < 1.2) d = Math.max(d, 0.9)
-  for (const exOff of [-7, 7]) {
-    const eye = ell(x, y, 30 + exOff, 14, 4.2, 4.2)
+  if (segDist(x, y, [6, 4.5], [11, 7]) < 0.9) d = Math.max(d, 0.95)
+  if (segDist(x, y, [18, 4.5], [13, 7]) < 0.9) d = Math.max(d, 0.95)
+  for (const exOff of [-4, 4]) {
     if (alert) {
-      if (Math.abs(eye - 1) < 0.19) d = Math.max(d, 0.95) // open ring
-      if (eye < 0.4) d = Math.max(d, 0.95) // pupil
+      // open: solid eyes — discs beat rings at this resolution
+      if (ell(x, y, 12 + exOff, 9.5, 2, 2) < 1) d = Math.max(d, 1)
     } else {
       // resting: the sleepy crescent, an arc hugging the lower lid
-      if (Math.abs(eye - 1) < 0.22 && y > 14 && y < 18.5) d = Math.max(d, 0.95)
+      const eye = ell(x, y, 12 + exOff, 9, 2.1, 2.1)
+      if (Math.abs(eye - 1) < 0.34 && y > 9.4 && y < 12.5) d = Math.max(d, 1)
     }
   }
   // beak
-  if (inTriangle(x, y, [28.3, 19.5], [31.7, 19.5], [30, 24])) d = Math.max(d, 0.7)
+  if (inTriangle(x, y, [10.9, 12], [13.1, 12], [12, 15])) d = Math.max(d, 0.8)
 
-  // --- the perch: a diagonal branch, the tail hanging past it ---------------
-  const branchD = segDist(x, y, [1, 62], [59, 48])
-  if (branchD < 1.8) d = Math.max(d, 0.6)
-  else if (branchD < 4 && y > 50) d = Math.max(d, 0.08)
+  // --- the perch: a branch under the talons ---------------------------------
+  if (segDist(x, y, [0.5, 22.8], [23.5, 21.4]) < 0.9) d = Math.max(d, 0.65)
   // talons gripping the branch
   for (const [fx, fy] of [
-    [24, 55.5],
-    [35, 52.5],
+    [8.5, 21.6],
+    [15.5, 21.2],
   ]) {
-    if (ell(x, y, fx, fy, 2.6, 2) < 1) d = Math.max(d, 0.85)
+    if (ell(x, y, fx, fy, 1.5, 1.2) < 1) d = Math.max(d, 0.9)
   }
 
   return d
@@ -234,7 +216,7 @@ function renderFlight(wing: number): string[] {
 
 const resting = render(false)
 const alert = render(true)
-console.log("=== resting ===")
+console.log("=== perched resting ===")
 for (const line of resting) console.log(line)
 console.log("=== alert ===")
 for (const line of alert) console.log(line)

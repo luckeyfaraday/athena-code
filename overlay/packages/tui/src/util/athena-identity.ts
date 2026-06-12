@@ -80,122 +80,45 @@ export function weaveFrames(width = 8, holdHome = 5, holdFar = 3): string[] {
   return frames
 }
 
-// --- the mark ---------------------------------------------------------------
-
-// Six spokes of the Athena mark as (row-step, col-step, glyph). Columns step
-// by two so the diagonals read at roughly the right angle given a terminal
-// cell's ~2:1 height:width ratio. The centre cell stays hollow, like the SVG.
-const MARK_SPOKES: ReadonlyArray<readonly [number, number, string]> = [
-  [-1, 0, "|"],
-  [1, 0, "|"],
-  [-1, -2, "\\"],
-  [-1, 2, "/"],
-  [1, -2, "/"],
-  [1, 2, "\\"],
-]
-
-// Render the mark with `grown` of `spokeLen` segments per spoke — the splash
-// animates grown upward; static renders pass grown >= spokeLen.
-export function markLines(grown: number, spokeLen = 3): string[] {
-  const rows = 2 * spokeLen + 1
-  const cols = 4 * spokeLen + 1
-  const grid = Array.from({ length: rows }, () => Array<string>(cols).fill(" "))
-  for (const [dy, dx, glyph] of MARK_SPOKES) {
-    for (let i = 1; i <= Math.min(grown, spokeLen); i++) {
-      grid[spokeLen + dy * i][2 * spokeLen + dx * i] = glyph
-    }
-  }
-  return grid.map((row) => row.join(""))
-}
-
-// --- the meander -------------------------------------------------------------
-
-// The signature horizontal motif (docs/ui-identity-design.md §5): a
-// crenellated Greek-key run used where upstream draws a plain rule. Position
-// i mod 4 walks ─ ┐ ␣ ┌, so widths of 4k+1 end on a clean ─.
-const MEANDER = ["─", "┐", " ", "┌"] as const
-
-export function meanderLine(width: number): string {
-  let out = ""
-  for (let i = 0; i < width; i++) out += MEANDER[i % MEANDER.length]
-  return out
-}
-
 // --- the owl ---------------------------------------------------------------
 
-export type OwlState = "idle" | "thinking" | "working"
+// The perched Athena owl — the masthead and the logo — rendered as
+// dot-density stipple art on braille cells (each char a 2x4 dot grid): ear
+// tufts, a heavy brow, sleepy crescent eyes, talons on a branch. Sized to the
+// flight sprite below so the landing reads as the same bird folding its
+// wings. Baked by scripts/generate-braille-owl.ts (seeded, reproducible) —
+// regenerate there, never hand-edit dots. The resting frame has the eyes
+// closed to crescents; the alternate frame opens them — the owl glancing up
+// at you — shown on a rare randomized timer and right after landing.
+export const OWL_PERCHED_FACE_ROWS: ReadonlyArray<number> = [2]
 
-// Pure frame function (rendered by component/athena-owl.tsx) so tests can pin
-// every state without timers or JSX: ear tufts, face, wing, perch. The face
-// is OWL_FACE_ROW so the renderer can light it differently from the body.
-export const OWL_FACE_ROW = 1
-
-export function owlLines(state: OwlState, blink = false, tick = false): string[] {
-  const face = state === "thinking" || blink ? "(-,-)" : "(o,o)"
-  const wing = state === "working" && tick ? "/)_)~" : "/)_)"
-  return [",___,", face, wing, `-"-"-`]
-}
-
-// --- the grand owl -----------------------------------------------------------
-
-// The full perched owl for the home screen when the terminal is tall enough,
-// rendered as dot-density stipple art on braille cells (each char a 2x4 dot
-// grid), after the classic pointillist owl illustrations: ear tufts, a heavy
-// brow, sleepy crescent eyes, a long folded wing, the tail hanging past a
-// diagonal branch. Baked by scripts/generate-braille-owl.ts (seeded,
-// reproducible) — regenerate there, never hand-edit dots. The resting frame
-// has the eyes closed to crescents; the alternate frame opens them wide — the
-// owl glancing up at you — and is shown on the same rare randomized timer the
-// companion owl blinks on.
-export const OWL_GRAND_FACE_ROWS: ReadonlyArray<number> = [2, 3, 4]
-
-const OWL_GRAND_RESTING: ReadonlyArray<string> = [
-  "⠀⠀⠀⠀⠀⠖⡠⢠⢄⢀⠀⢀⡠⡤⢤⠤⣠⢄⡀⣀⡀⡄⣄⠶⡤⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⢼⣼⠿⡽⠝⠁⠂⠀⠈⠀⠀⠠⠈⠻⣻⣺⢝⠃⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⠨⡟⡉⠙⡻⢶⣦⣆⠀⠀⣠⣐⡶⠿⠋⠏⡼⡅⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⢘⠟⡁⣴⠀⠄⠀⣥⠠⠀⣬⠀⠀⠀⣥⢀⡶⡇⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⠀⠢⣐⡜⠓⠒⠚⠃⢀⣀⠘⠗⢂⢚⣃⢫⠝⠀⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⠀⢀⠔⡿⠄⠀⡀⠄⠰⡇⠠⡠⡀⠘⠸⠤⡀⠀⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⠠⠌⠃⠀⠌⠂⠀⠆⠀⡀⠅⠀⠀⠡⡄⠩⢳⡀⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⢀⢆⢀⠀⠀⠑⠄⠀⢚⠠⡂⠄⠄⠀⠒⣠⠀⠈⢱⡀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠈⠵⠠⡀⠀⡈⠐⡄⢀⠠⠔⠈⠀⠀⡐⠰⠔⠰⢄⠅⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠘⣏⡀⠀⢀⠈⡁⠀⠅⠀⠀⠪⢁⠀⠘⠂⠐⠂⣌⠇⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⢃⣘⡠⠀⠀⢀⠍⡊⠅⠀⠔⠂⠍⠃⡀⡈⣗⡛⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⠀⠹⡧⡐⢠⠀⠀⠆⠀⢀⠥⠁⠡⢸⢀⡠⠆⠀⠀⠀⠀⠀⡀⢀",
-  "⠀⠀⠀⠀⠀⠀⠀⠀⠈⠑⢮⡻⠂⠁⠀⠠⢀⣄⡀⣝⣦⣥⣴⡢⣾⣓⠯⠕⠛⠃",
-  "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣷⣴⣲⢐⣐⣟⣸⢳⢅⡝⠯⡉⠉⠀⠀⠀⠀⠀⠀",
-  "⠄⠀⡀⢈⢤⠀⡖⣦⣖⡢⠾⠿⢽⣣⠨⢁⠀⢀⡔⠎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-  "⡓⠒⠀⠟⠒⠊⠄⠀⠀⠀⠁⠀⠀⠀⠈⠉⠈⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+const OWL_PERCHED_RESTING: ReadonlyArray<string> = [
+  "⠀⠀⢀⣶⣀⢀⣀⣀⣴⡀⠀⠀",
+  "⠀⠀⣼⠍⠷⣬⣤⠾⠛⣧⠀⠀",
+  "⠀⠀⠻⣦⡴⠂⠐⢦⣴⠗⠀⠀",
+  "⠀⠀⢾⡡⠠⠘⠣⡈⡈⣱⠀⠀",
+  "⠀⠀⢂⡀⠨⠘⠀⠘⢜⡘⠀⠀",
+  "⠀⣄⠤⠙⠷⠇⠾⠻⠟⠶⠐⠚",
 ]
 
-const OWL_GRAND_ALERT: ReadonlyArray<string> = [
-  "⠀⠀⠀⠀⠀⠖⡠⢠⢄⢀⠀⢀⡠⡤⢤⠤⣠⢄⡀⣀⡀⡄⣄⠶⡤⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⢼⣼⠿⡽⠝⠁⠂⠀⠈⠀⠀⠠⠈⠻⣻⣺⢝⠃⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⠨⡟⡉⢹⡿⢶⣦⣆⠀⠀⣠⣔⡶⢿⡏⠏⡼⡅⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⢘⠟⡁⣿⠰⣯⠆⣿⠠⠀⣿⠠⡟⠆⣿⢀⡶⡇⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⠀⠢⣐⡜⠳⠶⠞⠃⢀⣀⠘⠷⢦⢚⣃⢫⠝⠀⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⠀⢀⠔⡿⠄⠀⡀⠄⠰⡇⠠⡠⡀⠘⠸⠤⡀⠀⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⠠⠌⠃⠀⠌⠂⠀⠆⠀⡀⠅⠀⠀⠡⡄⠩⢳⡀⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⢀⢆⢀⠀⠀⠑⠄⠀⢚⠠⡂⠄⠄⠀⠒⣠⠀⠈⢱⡀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠈⠵⠠⡀⠀⡈⠐⡄⢀⠠⠔⠈⠀⠀⡐⠰⠔⠰⢄⠅⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠘⣏⡀⠀⢀⠈⡁⠀⠅⠀⠀⠪⢁⠀⠘⠂⠐⠂⣌⠇⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⢃⣘⡠⠀⠀⢀⠍⡊⠅⠀⠔⠂⠍⠃⡀⡈⣗⡛⠀⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⠀⠹⡧⡐⢠⠀⠀⠆⠀⢀⠥⠁⠡⢸⢀⡠⠆⠀⠀⠀⠀⠀⡀⢀",
-  "⠀⠀⠀⠀⠀⠀⠀⠀⠈⠑⢮⡻⠂⠁⠀⠠⢀⣄⡀⣝⣦⣥⣴⡢⣾⣓⠯⠕⠛⠃",
-  "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣷⣴⣲⢐⣐⣟⣸⢳⢅⡝⠯⡉⠉⠀⠀⠀⠀⠀⠀",
-  "⠄⠀⡀⢈⢤⠀⡖⣦⣖⡢⠾⠿⢽⣣⠨⢁⠀⢀⡔⠎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-  "⡓⠒⠀⠟⠒⠊⠄⠀⠀⠀⠁⠀⠀⠀⠈⠉⠈⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+const OWL_PERCHED_ALERT: ReadonlyArray<string> = [
+  "⠀⠀⢀⣶⣀⢀⣀⣀⣴⡀⠀⠀",
+  "⠀⠀⣼⠍⠷⣬⣤⠾⠛⣧⠀⠀",
+  "⠀⠀⠫⡿⠿⠀⠀⠿⢿⠕⠀⠀",
+  "⠀⠀⢾⡡⠠⠘⠣⡈⡈⣱⠀⠀",
+  "⠀⠀⢂⡀⠨⠘⠀⠘⢜⡘⠀⠀",
+  "⠀⣄⠤⠙⠷⠇⠾⠻⠟⠶⠐⠚",
 ]
 
-export function owlGrandLines(alert = false): string[] {
-  return [...(alert ? OWL_GRAND_ALERT : OWL_GRAND_RESTING)]
+export function owlPerchedLines(alert = false): string[] {
+  return [...(alert ? OWL_PERCHED_ALERT : OWL_PERCHED_RESTING)]
 }
 
 // --- the owl in flight ---------------------------------------------------------
 
-// The entrance sprite: the owl gliding in side-on, facing right, three wing
+// The startup sprite: the owl gliding in side-on, facing right, three wing
 // positions cycled while it swoops down to the perch. Baked by
-// scripts/generate-braille-owl.ts like the grand owl — regenerate there,
+// scripts/generate-braille-owl.ts like the perched owl — regenerate there,
 // never hand-edit dots. Index order: wings up, mid, down.
 export const OWL_FLIGHT_FRAMES: ReadonlyArray<ReadonlyArray<string>> = [
   [

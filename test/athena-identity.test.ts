@@ -7,16 +7,12 @@ import {
   WORKING_VERBS,
   dailyAphorism,
   flightScene,
-  markLines,
-  meanderLine,
-  OWL_FACE_ROW,
   OWL_FLIGHT_FRAMES,
   OWL_FLIGHT_HEIGHT,
   OWL_FLIGHT_WIDTH,
   owlFlightFrame,
-  OWL_GRAND_FACE_ROWS,
-  owlGrandLines,
-  owlLines,
+  OWL_PERCHED_FACE_ROWS,
+  owlPerchedLines,
   verbSeed,
   WEAVE_BARE,
   WEAVE_SHUTTLE,
@@ -51,34 +47,13 @@ test("the daily aphorism is stable within a day and attributed", () => {
   }
 })
 
-test("the mark blooms six spokes around a hollow centre", () => {
-  const full = markLines(3)
-  expect(full.length).toBe(7)
-  expect(full.every((line) => line.length === 13)).toBe(true)
-  expect(full[3][6]).toBe(" ") // hollow centre
-  expect(full[0][6]).toBe("|") // vertical spokes fully grown
-  expect(full[0][0]).toBe("\\") // diagonals reach the corners
-  // Partially grown marks stay inside the same canvas.
-  expect(markLines(1).length).toBe(7)
-  expect(markLines(1)[0].trim()).toBe("")
-  // Compact mark for short terminals.
-  const compact = markLines(2, 2)
-  expect(compact.length).toBe(5)
-  expect(compact.every((line) => line.length === 9)).toBe(true)
-})
-
-test("owl frames cover idle, blink, thinking, and working ticks", () => {
-  expect(owlLines("idle")).toEqual([",___,", "(o,o)", "/)_)", `-"-"-`])
-  expect(owlLines("idle", true)[OWL_FACE_ROW]).toBe("(-,-)")
-  expect(owlLines("thinking")[OWL_FACE_ROW]).toBe("(-,-)")
-  expect(owlLines("working", false, true)[2]).toBe("/)_)~")
-  expect(owlLines("working", false, false)[2]).toBe("/)_)")
-})
-
-test("the grand owl is uniform-width braille stipple art, and glances up", () => {
-  const resting = owlGrandLines()
+test("the perched owl is uniform-width braille stipple art, and glances up", () => {
+  const resting = owlPerchedLines()
   const width = resting[0].length
   expect(resting.every((line) => line.length === width)).toBe(true)
+  // The perched owl shares the flight sprite's width so the landing reads as
+  // the same bird folding its wings.
+  expect(width).toBe(OWL_FLIGHT_WIDTH)
   // Every glyph is a braille cell (U+2800–U+28FF) so the stipple renders as
   // dot-matrix art in any font that has the braille block.
   for (const line of resting) {
@@ -88,16 +63,16 @@ test("the grand owl is uniform-width braille stipple art, and glances up", () =>
       expect(code).toBeLessThanOrEqual(0x28ff)
     }
   }
-  const alert = owlGrandLines(true)
+  const alert = owlPerchedLines(true)
   expect(alert.length).toBe(resting.length)
   expect(alert.every((line) => line.length === width)).toBe(true)
   // Opening the eyes changes the face and nothing else.
   expect(alert.join("\n")).not.toBe(resting.join("\n"))
   for (let row = 0; row < resting.length; row++) {
     if (resting[row] === alert[row]) continue
-    expect(OWL_GRAND_FACE_ROWS).toContain(row)
+    expect(OWL_PERCHED_FACE_ROWS).toContain(row)
   }
-  for (const row of OWL_GRAND_FACE_ROWS) expect(row).toBeLessThan(resting.length)
+  for (const row of OWL_PERCHED_FACE_ROWS) expect(row).toBeLessThan(resting.length)
 })
 
 test("the flight frames are uniform braille sprites cycling up-mid-down-mid", () => {
@@ -158,9 +133,3 @@ test("the weave shuttles across the warp, holds at each selvedge, and returns", 
   expect(frames.at(-1)).toBe(WEAVE_SHUTTLE + WEAVE_BARE.repeat(7))
 })
 
-test("the meander rule walks the Greek key and ends clean on 4k+1 widths", () => {
-  expect(meanderLine(9)).toBe("─┐ ┌─┐ ┌─")
-  expect(meanderLine(33).startsWith("─┐ ┌─")).toBe(true)
-  expect(meanderLine(33).endsWith("─")).toBe(true)
-  expect(meanderLine(33).length).toBe(33)
-})

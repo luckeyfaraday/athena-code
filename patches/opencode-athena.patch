@@ -78,7 +78,7 @@ index e7abd0dc9..481436b7f 100644
 +  .command(MemoryCommand)
    .parse()
 diff --git a/packages/tui/src/app.tsx b/packages/tui/src/app.tsx
-index ec1fe4d7d..2d8df3866 100644
+index ec1fe4d7d..078efed48 100644
 --- a/packages/tui/src/app.tsx
 +++ b/packages/tui/src/app.tsx
 @@ -4,6 +4,7 @@ import { Deferred, Effect } from "effect"
@@ -89,15 +89,6 @@ index ec1fe4d7d..2d8df3866 100644
  import { ClipboardProvider, useClipboard } from "./context/clipboard"
  import { EpilogueProvider } from "./context/epilogue"
  import * as Selection from "./util/selection"
-@@ -31,7 +32,7 @@ import { ProjectProvider, useProject } from "./context/project"
- import { EditorContextProvider } from "./context/editor"
- import { useEvent } from "./context/event"
- import { SDKProvider, useSDK } from "./context/sdk"
--import { StartupLoading } from "./component/startup-loading"
-+import { AthenaSplash } from "./component/athena-splash"
- import { SyncProvider, useSync } from "./context/sync"
- import { SyncProviderV2 } from "./context/sync-v2"
- import { LocalProvider, useLocal } from "./context/local"
 @@ -420,24 +421,24 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
      if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
  
@@ -127,15 +118,6 @@ index ec1fe4d7d..2d8df3866 100644
      }
    })
  
-@@ -1074,7 +1075,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
-         <pluginRuntime.Slot name="app" />
-       </Show>
-       <Show when={!startup.skipInitialLoading}>
--        <StartupLoading ready={ready} />
-+        <AthenaSplash ready={ready} />
-       </Show>
-     </box>
-   )
 diff --git a/packages/tui/src/attention.ts b/packages/tui/src/attention.ts
 index b309edcd9..4751cae9c 100644
 --- a/packages/tui/src/attention.ts
