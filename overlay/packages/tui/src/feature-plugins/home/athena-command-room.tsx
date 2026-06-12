@@ -1,24 +1,17 @@
 // The command room — the home screen's identity block under the prompt
-// (docs/ui-identity-design.md): a few lines of true numbers, the owl, and
-// the day's maxim. Every data line is real (cross-agent session index, git
-// branch); lines without data are omitted rather than rendered as zeros.
-// The memory status line is NOT repeated here — it already lives in the
-// home footer (athena-status.tsx).
+// (docs/ui-identity-design.md): a few lines of true numbers and the day's
+// maxim. Every data line is real (cross-agent session index, git branch);
+// lines without data are omitted rather than rendered as zeros. The owl lives
+// in the masthead above the prompt (athena-home-hero.tsx), and the memory
+// status line in the home footer (athena-status.tsx) — neither repeats here.
 
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
-import { useTerminalDimensions } from "@opentui/solid"
 import { useTuiPaths } from "../../context/runtime"
-import { AthenaGrandOwl, AthenaOwl } from "../../component/athena-owl"
 import { archiveStats, type ArchiveStats } from "../../util/athena-sessions"
 import { dailyAphorism } from "../../util/athena-identity"
 
 const STATS_REFRESH_MS = 30_000
-
-// Terminal rows needed before the grand owl joins the command room without
-// pushing the prompt or footer off screen (hero + prompt + rows + footer;
-// the braille owl is 16 rows tall plus the maxim beneath it).
-const GRAND_OWL_MIN_ROWS = 50
 
 function formatCount(value: number): string {
   return value.toLocaleString("en-US")
@@ -27,8 +20,6 @@ function formatCount(value: number): string {
 export function AthenaCommandRoom(props: { api: TuiPluginApi }) {
   const theme = () => props.api.theme.current
   const paths = useTuiPaths()
-  const dimensions = useTerminalDimensions()
-  const grand = createMemo(() => dimensions().height >= GRAND_OWL_MIN_ROWS)
   const directory = createMemo(() => props.api.state.path.directory || paths.cwd)
 
   const [stats, setStats] = createSignal<ArchiveStats | null>(null)
@@ -66,36 +57,23 @@ export function AthenaCommandRoom(props: { api: TuiPluginApi }) {
 
   return (
     <box width="100%" alignItems="center" paddingTop={2} flexShrink={1}>
-      <box flexDirection="column" gap={0}>
-        <For each={rows()}>
-          {(row) => (
-            <text wrapMode="none">
-              <span style={{ fg: theme().textMuted }}>{row.label.padEnd(labelWidth() + 3)}</span>
-              <span style={{ fg: theme().text }}>{row.value}</span>
-            </text>
-          )}
-        </For>
+      <box flexDirection="column" alignItems="center" gap={0}>
+        <box flexDirection="column">
+          <For each={rows()}>
+            {(row) => (
+              <text wrapMode="none">
+                <span style={{ fg: theme().textMuted }}>{row.label.padEnd(labelWidth() + 3)}</span>
+                <span style={{ fg: theme().text }}>{row.value}</span>
+              </text>
+            )}
+          </For>
+        </box>
         <Show when={rows().length > 0}>
           <text> </text>
         </Show>
-        <Show
-          when={grand()}
-          fallback={
-            <box flexDirection="row" gap={2} alignItems="center">
-              <AthenaOwl state={() => "idle"} color={theme().textMuted} faceColor={theme().text} />
-              <text fg={theme().textMuted} wrapMode="none">
-                “{maxim.text}” — {maxim.source}
-              </text>
-            </box>
-          }
-        >
-          <box flexDirection="column" alignItems="center" gap={1}>
-            <AthenaGrandOwl color={theme().textMuted} faceColor={theme().text} />
-            <text fg={theme().textMuted} wrapMode="none">
-              “{maxim.text}” — {maxim.source}
-            </text>
-          </box>
-        </Show>
+        <text fg={theme().textMuted} wrapMode="none">
+          “{maxim.text}” — {maxim.source}
+        </text>
       </box>
     </box>
   )

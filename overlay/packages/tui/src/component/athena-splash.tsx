@@ -22,22 +22,33 @@ const MAX_MS = 8000
 
 const SPOKE_LEN = 3
 
+// Whether the splash overlay is currently covering the app — the home
+// masthead holds the owl's entrance flight on this so the swoop starts the
+// moment the splash lifts instead of playing hidden behind it.
+const [splashActive, setSplashActive] = createSignal(false)
+export { splashActive }
+
 export function AthenaSplash(props: { ready: () => boolean }) {
   const theme = useTheme().theme
   const [frame, setFrame] = createSignal(0)
   const [done, setDone] = createSignal(false)
+  setSplashActive(true)
   const start = Date.now()
   const timer = setInterval(() => {
     const elapsed = Date.now() - start
     if (elapsed >= MAX_MS || (props.ready() && elapsed >= MIN_MS)) {
       clearInterval(timer)
       setDone(true)
+      setSplashActive(false)
       return
     }
     setFrame((f) => f + 1)
   }, FRAME_MS)
   timer.unref?.()
-  onCleanup(() => clearInterval(timer))
+  onCleanup(() => {
+    clearInterval(timer)
+    setSplashActive(false)
+  })
 
   const lines = createMemo(() => markLines(Math.min(SPOKE_LEN, 1 + Math.floor(frame() / 4))))
   const dots = createMemo(() => ".".repeat(1 + (Math.floor(frame() / 8) % 3)))

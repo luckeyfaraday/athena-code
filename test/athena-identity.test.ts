@@ -6,9 +6,14 @@ import {
   APHORISMS,
   WORKING_VERBS,
   dailyAphorism,
+  flightScene,
   markLines,
   meanderLine,
   OWL_FACE_ROW,
+  OWL_FLIGHT_FRAMES,
+  OWL_FLIGHT_HEIGHT,
+  OWL_FLIGHT_WIDTH,
+  owlFlightFrame,
   OWL_GRAND_FACE_ROWS,
   owlGrandLines,
   owlLines,
@@ -93,6 +98,44 @@ test("the grand owl is uniform-width braille stipple art, and glances up", () =>
     expect(OWL_GRAND_FACE_ROWS).toContain(row)
   }
   for (const row of OWL_GRAND_FACE_ROWS) expect(row).toBeLessThan(resting.length)
+})
+
+test("the flight frames are uniform braille sprites cycling up-mid-down-mid", () => {
+  expect(OWL_FLIGHT_FRAMES.length).toBe(3)
+  for (const frame of OWL_FLIGHT_FRAMES) {
+    expect(frame.length).toBe(OWL_FLIGHT_HEIGHT)
+    for (const line of frame) {
+      expect(line.length).toBe(OWL_FLIGHT_WIDTH)
+      for (const glyph of line) {
+        const code = glyph.charCodeAt(0)
+        expect(code).toBeGreaterThanOrEqual(0x2800)
+        expect(code).toBeLessThanOrEqual(0x28ff)
+      }
+    }
+  }
+  // The wing beat: up, mid, down, mid, and around again.
+  expect(owlFlightFrame(0)).toBe(OWL_FLIGHT_FRAMES[0])
+  expect(owlFlightFrame(1)).toBe(OWL_FLIGHT_FRAMES[1])
+  expect(owlFlightFrame(2)).toBe(OWL_FLIGHT_FRAMES[2])
+  expect(owlFlightFrame(3)).toBe(OWL_FLIGHT_FRAMES[1])
+  expect(owlFlightFrame(4)).toBe(OWL_FLIGHT_FRAMES[0])
+})
+
+test("the flight scene places the sprite and clips cleanly at every edge", () => {
+  const sprite = ["ab", "cd"]
+  // Fully on canvas.
+  expect(flightScene(5, 4, 1, 1, sprite)).toEqual(["     ", " ab  ", " cd  ", "     "])
+  // Entering from off-screen left and top.
+  expect(flightScene(5, 3, -1, -1, sprite)).toEqual(["d    ", "     ", "     "])
+  // Leaving past the right edge.
+  expect(flightScene(3, 2, 2, 0, sprite)).toEqual(["  a", "  c"])
+  // Entirely off canvas still yields a blank scene of the right size.
+  const blank = flightScene(4, 2, 10, 0, sprite)
+  expect(blank).toEqual(["    ", "    "])
+  // Every row is always exactly `width` cells so the layout never shifts.
+  for (const row of flightScene(30, 16, 7, 5, [...OWL_FLIGHT_FRAMES[1]])) {
+    expect(row.length).toBe(30)
+  }
 })
 
 test("the weave shuttles across the warp, holds at each selvedge, and returns", () => {

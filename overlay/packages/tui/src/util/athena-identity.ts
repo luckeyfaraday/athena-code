@@ -190,3 +190,69 @@ const OWL_GRAND_ALERT: ReadonlyArray<string> = [
 export function owlGrandLines(alert = false): string[] {
   return [...(alert ? OWL_GRAND_ALERT : OWL_GRAND_RESTING)]
 }
+
+// --- the owl in flight ---------------------------------------------------------
+
+// The entrance sprite: the owl gliding in side-on, facing right, three wing
+// positions cycled while it swoops down to the perch. Baked by
+// scripts/generate-braille-owl.ts like the grand owl — regenerate there,
+// never hand-edit dots. Index order: wings up, mid, down.
+export const OWL_FLIGHT_FRAMES: ReadonlyArray<ReadonlyArray<string>> = [
+  [
+    "⠀⠀⠀⠈⢷⣄⠀⠀⠀⠀⠀⠀",
+    "⠀⠀⠀⠀⠘⠻⢶⣄⠀⠀⠀⠀",
+    "⠀⠀⠀⣀⡠⠬⣷⣻⣷⡏⣽⣷",
+    "⠠⠶⠻⠩⠹⢴⣻⣏⡏⠟⠒⠋",
+    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+  ],
+  [
+    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+    "⠀⠻⢶⡤⣄⡀⠀⠀⠀⠀⠀⠀",
+    "⠀⠀⠀⣈⡿⠽⣷⣶⣴⡏⣽⣷",
+    "⠠⠶⠻⠩⠹⢴⣻⣏⡏⠟⠒⠋",
+    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+  ],
+  [
+    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+    "⠀⠀⠀⣀⡠⠤⣤⣠⣴⡏⣽⣷",
+    "⠠⠶⠻⠩⠹⢴⣻⣿⡏⠟⠒⠋",
+    "⠀⠀⠀⠀⣠⡾⠋⠁⠀⠀⠀⠀",
+  ],
+]
+
+export const OWL_FLIGHT_WIDTH = OWL_FLIGHT_FRAMES[0][0].length
+export const OWL_FLIGHT_HEIGHT = OWL_FLIGHT_FRAMES[0].length
+
+// Wing cycle while flying: up → mid → down → mid → up …
+export function owlFlightFrame(step: number): ReadonlyArray<string> {
+  const cycle = [0, 1, 2, 1] as const
+  return OWL_FLIGHT_FRAMES[cycle[Math.abs(step) % cycle.length]]
+}
+
+// Compose the flying sprite onto a blank scene of `width` x `height` cells with
+// the sprite's top-left at (x, y) — pure string padding so the swoop is
+// testable; the component just advances (x, y) along the glide path. The
+// sprite clips cleanly at every edge so it can enter from off-screen.
+export function flightScene(width: number, height: number, x: number, y: number, sprite: ReadonlyArray<string>): string[] {
+  const blank = " ".repeat(width)
+  const scene: string[] = []
+  for (let row = 0; row < height; row++) {
+    const spriteRow = row - y
+    if (spriteRow < 0 || spriteRow >= sprite.length) {
+      scene.push(blank)
+      continue
+    }
+    const line = sprite[spriteRow]
+    const from = Math.max(0, -x)
+    const to = Math.min(line.length, width - x)
+    if (from >= to) {
+      scene.push(blank)
+      continue
+    }
+    const left = Math.max(0, x)
+    const visible = line.slice(from, to)
+    scene.push(" ".repeat(left) + visible + " ".repeat(width - left - visible.length))
+  }
+  return scene
+}

@@ -160,6 +160,78 @@ function render(alert: boolean): string[] {
   return lines
 }
 
+// --- the owl in flight --------------------------------------------------------
+//
+// A small companion sprite for the home-screen entrance: the owl gliding in
+// side-on, facing right, on a 24x20 dot canvas (12 cells x 5 rows). Three wing
+// positions — up / mid / down — cycled while the sprite swoops down to the
+// perch, where the component swaps it for the grand owl above.
+
+const FLIGHT_W = 24
+const FLIGHT_H = 20
+
+function flightDensity(x: number, y: number, wing: number): number {
+  let d = 0
+
+  // body and head, gliding posture: head a touch above the body line
+  const body = ell(x, y, 14, 13, 6, 3)
+  const head = ell(x, y, 20.5, 11, 3.4, 3.2)
+  if (body < 1 || head < 1) {
+    d = head < 0.9 ? 0.3 : 0.55
+    if (Math.abs(body - 1) * 4.5 < 1.6 && head > 0.9) d = 0.9
+    if (Math.abs(head - 1) * 3.3 < 1.4) d = 0.9
+  }
+  // solid eye on the lighter head
+  if (ell(x, y, 21.5, 10.5, 1.1, 1.1) < 1) d = 1
+  // beak point
+  if (inTriangle(x, y, [23.2, 11], [23.2, 12.6], [25.2, 11.8])) d = Math.max(d, 0.85)
+
+  // tail fan trailing behind
+  if (inTriangle(x, y, [10, 11], [10, 15.5], [1.5, 14.5])) d = Math.max(d, 0.55)
+  if (segDist(x, y, [10, 11], [1.5, 14.5]) < 0.9) d = Math.max(d, 0.85)
+
+  // the near wing, three positions about the shoulder
+  const tips: ReadonlyArray<[number, number]> = [
+    [8, 0.5], // up
+    [2.5, 5], // mid
+    [9, 19.5], // down
+  ]
+  const tip = tips[wing]
+  const root: [number[], number[]] = wing === 2 ? [[11, 13], [17.5, 13]] : [[10.5, 12.5], [18, 11.5]]
+  if (inTriangle(x, y, root[0], root[1], tip)) d = Math.max(d, 0.55)
+  // emphasized leading edge so the wing reads as a stroke, not a smudge
+  if (segDist(x, y, root[1], tip) < 1) d = Math.max(d, 0.95)
+
+  return d
+}
+
+function renderFlight(wing: number): string[] {
+  const rand = prng(0x0a7e0a)
+  const dots: boolean[][] = []
+  for (let y = 0; y < FLIGHT_H; y++) {
+    dots.push([])
+    for (let x = 0; x < FLIGHT_W; x++) {
+      dots[y].push(rand() < flightDensity(x + 0.5, y + 0.5, wing))
+    }
+  }
+  const lines: string[] = []
+  for (let cy = 0; cy < FLIGHT_H / 4; cy++) {
+    let line = ""
+    for (let cx = 0; cx < FLIGHT_W / 2; cx++) {
+      let bits = 0
+      for (let dx = 0; dx < 2; dx++) {
+        for (let dy = 0; dy < 4; dy++) {
+          if (!dots[cy * 4 + dy][cx * 2 + dx]) continue
+          bits |= 1 << (dy < 3 ? dx * 3 + dy : 6 + dx)
+        }
+      }
+      line += String.fromCharCode(0x2800 + bits)
+    }
+    lines.push(line)
+  }
+  return lines
+}
+
 const resting = render(false)
 const alert = render(true)
 console.log("=== resting ===")
@@ -173,3 +245,16 @@ for (const line of alert) console.log(`  ${JSON.stringify(line)},`)
 const diff: number[] = []
 for (let i = 0; i < resting.length; i++) if (resting[i] !== alert[i]) diff.push(i)
 console.log(`=== rows differing between frames: [${diff.join(", ")}] ===`)
+
+const wingNames = ["up", "mid", "down"]
+const flightFrames = [0, 1, 2].map((wing) => renderFlight(wing))
+for (let wing = 0; wing < 3; wing++) {
+  console.log(`=== flight (${wingNames[wing]}) ===`)
+  for (const line of flightFrames[wing]) console.log(line)
+}
+console.log("=== TS (flight) ===")
+for (let wing = 0; wing < 3; wing++) {
+  console.log(`  [`)
+  for (const line of flightFrames[wing]) console.log(`    ${JSON.stringify(line)},`)
+  console.log(`  ],`)
+}

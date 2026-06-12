@@ -1,45 +1,42 @@
-// The home screen hero — replaces the bare wordmark in the home_logo slot so
-// the idle screen rhymes with the splash (docs/ui-identity-design.md): the
-// six-spoke mark above the native shimmering wordmark, the epithet, and the
-// meander rule. The mark steps down responsively so short terminals keep the
-// prompt and footer on screen.
+// The home screen masthead — the owl IS the logo (docs/ui-identity-design.md):
+// the grand braille owl on top with a single letterspaced wordmark line under
+// it, nothing else. The owl flies in once per launch (AthenaMastheadOwl) and
+// steps down responsively — small companion owl on short terminals, wordmark
+// only when there is no room for art at all.
 
-import { For, Show, createMemo } from "solid-js"
+import { Show, createMemo } from "solid-js"
+import { TextAttributes } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
 import { useTheme } from "../context/theme"
-import { markLines, meanderLine } from "../util/athena-identity"
-import { Logo } from "./logo"
+import { AthenaMastheadOwl, AthenaOwl } from "./athena-owl"
 
-// 33 = 4k+1 so the Greek-key run ends on a clean ─ at both edges.
-const RULE = meanderLine(33)
+// Rows needed to keep the prompt, command room, and footer on screen below
+// each masthead tier: the 16-row grand owl, the 4-row companion owl.
+const GRAND_MIN_ROWS = 40
+const SMALL_MIN_ROWS = 26
 
 export function AthenaHomeHero() {
   const theme = useTheme().theme
   const dimensions = useTerminalDimensions()
-  // Full mark from 32 rows, compact mark from 26, wordmark only below that.
-  const spokeLen = createMemo(() => (dimensions().height >= 32 ? 3 : dimensions().height >= 26 ? 2 : 0))
-  const mark = createMemo(() => (spokeLen() > 0 ? markLines(spokeLen(), spokeLen()) : []))
+  const tier = createMemo(() =>
+    dimensions().height >= GRAND_MIN_ROWS ? "grand" : dimensions().height >= SMALL_MIN_ROWS ? "small" : "word",
+  )
+  // The flight scene spans the home body's usable width (route padding of 2
+  // per side) so the owl can enter from the very edge of the terminal.
+  const sceneWidth = createMemo(() => Math.max(dimensions().width - 4, 0))
 
   return (
     <box flexDirection="column" alignItems="center" flexShrink={0}>
-      <Show when={mark().length > 0}>
-        <box flexDirection="column" alignItems="center" paddingBottom={1}>
-          <For each={mark()}>
-            {(line) => (
-              <text fg={theme.primary} selectable={false}>
-                {line}
-              </text>
-            )}
-          </For>
-        </box>
+      <Show when={tier() === "grand"}>
+        <AthenaMastheadOwl color={theme.textMuted} faceColor={theme.text} width={sceneWidth} />
       </Show>
-      <Logo />
-      <text fg={theme.textMuted} selectable={false}>
-        c o m m a n d   r o o m
-      </text>
+      <Show when={tier() === "small"}>
+        <AthenaOwl state={() => "idle"} color={theme.textMuted} faceColor={theme.text} />
+      </Show>
       <box paddingTop={1}>
-        <text fg={theme.border} selectable={false}>
-          {RULE}
+        <text wrapMode="none" selectable={false}>
+          <span style={{ fg: theme.primary, attributes: TextAttributes.BOLD }}>A T H E N A</span>
+          <span style={{ fg: theme.textMuted }}>{"   ·   c o m m a n d   r o o m"}</span>
         </text>
       </box>
     </box>
