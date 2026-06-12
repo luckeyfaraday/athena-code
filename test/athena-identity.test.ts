@@ -70,29 +70,29 @@ test("owl frames cover idle, blink, thinking, and working ticks", () => {
   expect(owlLines("working", false, false)[2]).toBe("/)_)")
 })
 
-test("the grand owl is uniform-width braille stipple art, and blinks", () => {
-  const open = owlGrandLines()
-  const width = open[0].length
-  expect(open.every((line) => line.length === width)).toBe(true)
+test("the grand owl is uniform-width braille stipple art, and glances up", () => {
+  const resting = owlGrandLines()
+  const width = resting[0].length
+  expect(resting.every((line) => line.length === width)).toBe(true)
   // Every glyph is a braille cell (U+2800–U+28FF) so the stipple renders as
   // dot-matrix art in any font that has the braille block.
-  for (const line of open) {
+  for (const line of resting) {
     for (const glyph of line) {
       const code = glyph.charCodeAt(0)
       expect(code).toBeGreaterThanOrEqual(0x2800)
       expect(code).toBeLessThanOrEqual(0x28ff)
     }
   }
-  const blink = owlGrandLines(true)
-  expect(blink.length).toBe(open.length)
-  expect(blink.every((line) => line.length === width)).toBe(true)
-  // The blink changes the eyes and nothing else.
-  expect(blink.join("\n")).not.toBe(open.join("\n"))
-  for (let row = 0; row < open.length; row++) {
-    if (open[row] === blink[row]) continue
+  const alert = owlGrandLines(true)
+  expect(alert.length).toBe(resting.length)
+  expect(alert.every((line) => line.length === width)).toBe(true)
+  // Opening the eyes changes the face and nothing else.
+  expect(alert.join("\n")).not.toBe(resting.join("\n"))
+  for (let row = 0; row < resting.length; row++) {
+    if (resting[row] === alert[row]) continue
     expect(OWL_GRAND_FACE_ROWS).toContain(row)
   }
-  for (const row of OWL_GRAND_FACE_ROWS) expect(row).toBeLessThan(open.length)
+  for (const row of OWL_GRAND_FACE_ROWS) expect(row).toBeLessThan(resting.length)
 })
 
 test("the weave shuttles across the warp, holds at each selvedge, and returns", () => {

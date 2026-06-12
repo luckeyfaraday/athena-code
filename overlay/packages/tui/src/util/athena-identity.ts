@@ -140,42 +140,53 @@ export function owlLines(state: OwlState, blink = false, tick = false): string[]
 
 // The full perched owl for the home screen when the terminal is tall enough,
 // rendered as dot-density stipple art on braille cells (each char a 2x4 dot
-// grid): ear tufts, the horned-owl brow, eyes, beak, folded wings over a
-// feathered chest, a stippled branch. Baked by scripts/generate-braille-owl.ts
-// (seeded, reproducible) — regenerate there, never hand-edit dots. The two
-// frames differ only in the eye rows: open, or closed to sleepy crescents.
-export const OWL_GRAND_FACE_ROWS: ReadonlyArray<number> = [2, 3]
+// grid), after the classic pointillist owl illustrations: ear tufts, a heavy
+// brow, sleepy crescent eyes, a long folded wing, the tail hanging past a
+// diagonal branch. Baked by scripts/generate-braille-owl.ts (seeded,
+// reproducible) — regenerate there, never hand-edit dots. The resting frame
+// has the eyes closed to crescents; the alternate frame opens them wide — the
+// owl glancing up at you — and is shown on the same rare randomized timer the
+// companion owl blinks on.
+export const OWL_GRAND_FACE_ROWS: ReadonlyArray<number> = [2, 3, 4]
 
-const OWL_GRAND_OPEN: ReadonlyArray<string> = [
-  "⠀⠀⠀⠀⢳⣠⡀⢀⡀⣀⢀⣀⣀⢀⡀⡤⡔⡜⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⢃⢼⢿⣕⡊⠌⠈⢐⡪⡿⣷⡜⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⢈⠘⢁⣬⡙⠃⠘⢋⣥⡘⠙⡁⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⢠⡕⡻⣿⠟⣻⣾⠿⣿⣷⠴⡇⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⢿⢡⡁⣄⣈⢃⠡⣅⣌⡋⠄⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⡐⢁⠂⠋⢛⠹⠧⠟⠋⠅⠀⠋⠈⢆⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⡒⠁⠂⠂⠀⠀⠀⡔⠀⠄⡀⢠⠸⠿⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⣀⠃⠆⠂⡈⠠⢍⠀⠀⠔⠄⠀⠴⡺⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⢗⢀⡁⠀⠀⢀⠮⠀⠀⠇⠀⠐⡖⡾⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⢣⣃⠌⠁⢀⠀⠂⠀⠠⠀⢁⡏⠁⠀⠀⠀⠀",
-  "⠀⣀⠀⢀⣀⣀⣉⣸⣦⣮⢀⡀⣲⣶⣖⣋⡀⣀⢀⣀⣀⠀",
-  "⠀⠐⠈⠀⠈⠀⠁⠀⠈⠑⠀⠐⠐⠀⠀⠐⠀⠈⠈⠐⠀⠀",
+const OWL_GRAND_RESTING: ReadonlyArray<string> = [
+  "⠀⠀⠀⠀⠀⠖⡠⢠⢄⢀⠀⢀⡠⡤⢤⠤⣠⢄⡀⣀⡀⡄⣄⠶⡤⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⢼⣼⠿⡽⠝⠁⠂⠀⠈⠀⠀⠠⠈⠻⣻⣺⢝⠃⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⠨⡟⡉⠙⡻⢶⣦⣆⠀⠀⣠⣐⡶⠿⠋⠏⡼⡅⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⢘⠟⡁⣴⠀⠄⠀⣥⠠⠀⣬⠀⠀⠀⣥⢀⡶⡇⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⠀⠢⣐⡜⠓⠒⠚⠃⢀⣀⠘⠗⢂⢚⣃⢫⠝⠀⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⠀⢀⠔⡿⠄⠀⡀⠄⠰⡇⠠⡠⡀⠘⠸⠤⡀⠀⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⠠⠌⠃⠀⠌⠂⠀⠆⠀⡀⠅⠀⠀⠡⡄⠩⢳⡀⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⢀⢆⢀⠀⠀⠑⠄⠀⢚⠠⡂⠄⠄⠀⠒⣠⠀⠈⢱⡀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠈⠵⠠⡀⠀⡈⠐⡄⢀⠠⠔⠈⠀⠀⡐⠰⠔⠰⢄⠅⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠘⣏⡀⠀⢀⠈⡁⠀⠅⠀⠀⠪⢁⠀⠘⠂⠐⠂⣌⠇⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⢃⣘⡠⠀⠀⢀⠍⡊⠅⠀⠔⠂⠍⠃⡀⡈⣗⡛⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⠀⠹⡧⡐⢠⠀⠀⠆⠀⢀⠥⠁⠡⢸⢀⡠⠆⠀⠀⠀⠀⠀⡀⢀",
+  "⠀⠀⠀⠀⠀⠀⠀⠀⠈⠑⢮⡻⠂⠁⠀⠠⢀⣄⡀⣝⣦⣥⣴⡢⣾⣓⠯⠕⠛⠃",
+  "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣷⣴⣲⢐⣐⣟⣸⢳⢅⡝⠯⡉⠉⠀⠀⠀⠀⠀⠀",
+  "⠄⠀⡀⢈⢤⠀⡖⣦⣖⡢⠾⠿⢽⣣⠨⢁⠀⢀⡔⠎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+  "⡓⠒⠀⠟⠒⠊⠄⠀⠀⠀⠁⠀⠀⠀⠈⠉⠈⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
 ]
 
-const OWL_GRAND_BLINK: ReadonlyArray<string> = [
-  "⠀⠀⠀⠀⢳⣠⡀⢀⡀⣀⢀⣀⣀⢀⡀⡤⡔⡜⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⢃⢼⢿⣕⡊⠌⠈⢐⡪⡿⣷⡜⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⢈⠘⠁⠈⠙⠃⠘⠋⠁⠘⠙⡁⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⢠⡕⣤⣶⡟⣻⣾⢶⣿⣶⠴⡇⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⠀⢿⢡⡁⣄⣈⢃⠡⣅⣌⡋⠄⠀⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⡐⢁⠂⠋⢛⠹⠧⠟⠋⠅⠀⠋⠈⢆⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⡒⠁⠂⠂⠀⠀⠀⡔⠀⠄⡀⢠⠸⠿⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⣀⠃⠆⠂⡈⠠⢍⠀⠀⠔⠄⠀⠴⡺⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⢗⢀⡁⠀⠀⢀⠮⠀⠀⠇⠀⠐⡖⡾⠀⠀⠀⠀",
-  "⠀⠀⠀⠀⠀⢣⣃⠌⠁⢀⠀⠂⠀⠠⠀⢁⡏⠁⠀⠀⠀⠀",
-  "⠀⣀⠀⢀⣀⣀⣉⣸⣦⣮⢀⡀⣲⣶⣖⣋⡀⣀⢀⣀⣀⠀",
-  "⠀⠐⠈⠀⠈⠀⠁⠀⠈⠑⠀⠐⠐⠀⠀⠐⠀⠈⠈⠐⠀⠀",
+const OWL_GRAND_ALERT: ReadonlyArray<string> = [
+  "⠀⠀⠀⠀⠀⠖⡠⢠⢄⢀⠀⢀⡠⡤⢤⠤⣠⢄⡀⣀⡀⡄⣄⠶⡤⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⢼⣼⠿⡽⠝⠁⠂⠀⠈⠀⠀⠠⠈⠻⣻⣺⢝⠃⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⠨⡟⡉⢹⡿⢶⣦⣆⠀⠀⣠⣔⡶⢿⡏⠏⡼⡅⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⢘⠟⡁⣿⠰⣯⠆⣿⠠⠀⣿⠠⡟⠆⣿⢀⡶⡇⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⠀⠢⣐⡜⠳⠶⠞⠃⢀⣀⠘⠷⢦⢚⣃⢫⠝⠀⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⠀⢀⠔⡿⠄⠀⡀⠄⠰⡇⠠⡠⡀⠘⠸⠤⡀⠀⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⠠⠌⠃⠀⠌⠂⠀⠆⠀⡀⠅⠀⠀⠡⡄⠩⢳⡀⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⢀⢆⢀⠀⠀⠑⠄⠀⢚⠠⡂⠄⠄⠀⠒⣠⠀⠈⢱⡀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠈⠵⠠⡀⠀⡈⠐⡄⢀⠠⠔⠈⠀⠀⡐⠰⠔⠰⢄⠅⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠘⣏⡀⠀⢀⠈⡁⠀⠅⠀⠀⠪⢁⠀⠘⠂⠐⠂⣌⠇⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⢃⣘⡠⠀⠀⢀⠍⡊⠅⠀⠔⠂⠍⠃⡀⡈⣗⡛⠀⠀⠀⠀⠀⠀",
+  "⠀⠀⠀⠀⠀⠀⠀⠹⡧⡐⢠⠀⠀⠆⠀⢀⠥⠁⠡⢸⢀⡠⠆⠀⠀⠀⠀⠀⡀⢀",
+  "⠀⠀⠀⠀⠀⠀⠀⠀⠈⠑⢮⡻⠂⠁⠀⠠⢀⣄⡀⣝⣦⣥⣴⡢⣾⣓⠯⠕⠛⠃",
+  "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣷⣴⣲⢐⣐⣟⣸⢳⢅⡝⠯⡉⠉⠀⠀⠀⠀⠀⠀",
+  "⠄⠀⡀⢈⢤⠀⡖⣦⣖⡢⠾⠿⢽⣣⠨⢁⠀⢀⡔⠎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+  "⡓⠒⠀⠟⠒⠊⠄⠀⠀⠀⠁⠀⠀⠀⠈⠉⠈⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
 ]
 
-export function owlGrandLines(blink = false): string[] {
-  return [...(blink ? OWL_GRAND_BLINK : OWL_GRAND_OPEN)]
+export function owlGrandLines(alert = false): string[] {
+  return [...(alert ? OWL_GRAND_ALERT : OWL_GRAND_RESTING)]
 }

@@ -56,11 +56,12 @@ export function AthenaOwl(props: { state: () => OwlState; color: RGBA; faceColor
   )
 }
 
-// The full perched owl for tall home screens — same companion, grown up.
-// Idle by nature (it lives on the idle screen), so it only blinks.
+// The full perched owl for tall home screens — braille stipple art, resting
+// with crescent eyes. The blink timer is inverted here: on the same rare
+// randomized schedule, the owl briefly opens its eyes and glances up at you.
 export function AthenaGrandOwl(props: { color: RGBA; faceColor?: RGBA }) {
-  const blink = createBlink()
-  const lines = () => owlGrandLines(blink())
+  const alert = createBlink()
+  const lines = () => owlGrandLines(alert())
   return (
     <box flexDirection="column" flexShrink={0}>
       <For each={lines()}>

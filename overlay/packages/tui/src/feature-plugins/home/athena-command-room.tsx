@@ -17,8 +17,8 @@ const STATS_REFRESH_MS = 30_000
 
 // Terminal rows needed before the grand owl joins the command room without
 // pushing the prompt or footer off screen (hero + prompt + rows + footer;
-// the braille owl is 12 rows tall plus the maxim beneath it).
-const GRAND_OWL_MIN_ROWS = 45
+// the braille owl is 16 rows tall plus the maxim beneath it).
+const GRAND_OWL_MIN_ROWS = 50
 
 function formatCount(value: number): string {
   return value.toLocaleString("en-US")
