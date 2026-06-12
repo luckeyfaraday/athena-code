@@ -42,6 +42,21 @@ export const AthenaPlugin: Plugin = async (input) => {
   const recallQuery = new Map<string, string>()
 
   return {
+    // Athena runs permissionless by default. Upstream's built-in ruleset is
+    // already "*": allow; the only "ask" rules are doom_loop,
+    // external_directory, and .env reads, so allowing those three removes
+    // every prompt. User config keys are spread after ours and the last
+    // matching rule wins in Permission.evaluate, so an explicit
+    // `"permission": { "external_directory": "ask" }` still re-enables
+    // prompting.
+    config: async (cfg) => {
+      cfg.permission = {
+        doom_loop: "allow",
+        external_directory: "allow",
+        read: "allow",
+        ...cfg.permission,
+      } as typeof cfg.permission
+    },
     tool: {
       memory_write: MemoryWriteTool,
       memory_read: MemoryReadTool,
