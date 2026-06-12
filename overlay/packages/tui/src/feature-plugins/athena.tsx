@@ -7,6 +7,7 @@ import type { TuiPlugin } from "@opencode-ai/plugin/tui"
 import type { BuiltinTuiPlugin } from "./builtins"
 import { DialogAthenaSessions } from "../component/dialog-athena-sessions"
 import { AthenaHomeHero } from "../component/athena-home-hero"
+import { AthenaDepartureFlight } from "../component/athena-owl"
 import { AthenaWorkingVerb } from "../component/athena-working-verb"
 import { AthenaCommandRoom } from "./home/athena-command-room"
 import { AthenaHomeFooter } from "./home/athena-status"
@@ -31,6 +32,9 @@ const tui: TuiPlugin = async (api) => {
       },
       session_prompt_right(_ctx, props) {
         return <AthenaWorkingVerb api={api} sessionID={props.session_id} />
+      },
+      app() {
+        return <AthenaDepartureFlight color={() => api.theme.current.textMuted} />
       },
     },
   })

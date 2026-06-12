@@ -6,7 +6,9 @@
 // the body so the eyes carry the expression.
 
 import type { RGBA } from "@opentui/core"
-import { For, Match, Switch, createEffect, createMemo, createSignal, onCleanup, type Accessor } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, type Accessor } from "solid-js"
+import { useTerminalDimensions } from "@opentui/solid"
+import { useRoute } from "../context/route"
 import {
   OWL_FLIGHT_HEIGHT,
   OWL_FLIGHT_WIDTH,
@@ -82,108 +84,128 @@ let flownThisLaunch = false
 
 // The home masthead: once per launch the owl swoops in from the top-left —
 // wings cycling, descending toward the perch — lands with an alert glance at
-// you, then settles into the resting pose. When `depart` flips true (the
-// first message being typed), it takes off and crosses to the right edge of
-// the screen, accelerating as it goes; a departure triggered mid-arrival
-// continues from wherever the owl is. The scene box keeps the perched owl's
-// footprint through every phase so the layout never jumps.
-export function AthenaMastheadOwl(props: {
-  color: RGBA
-  faceColor?: RGBA
-  width: Accessor<number>
-  depart?: Accessor<boolean>
-}) {
+// you, then settles into the resting pose. The scene box keeps the perched
+// owl's footprint for the whole flight so the layout never jumps.
+export function AthenaMastheadOwl(props: { color: RGBA; faceColor?: RGBA; width: Accessor<number> }) {
   const perched = owlPerchedLines()
   const owlWidth = perched[0].length
   const owlHeight = perched.length
-  // The flight band the sprite occupies when level with the perched owl.
-  const perchY = owlHeight - OWL_FLIGHT_HEIGHT
 
-  const sceneWidth = () => Math.max(props.width(), owlWidth)
-  const perchX = () => Math.floor((sceneWidth() - owlWidth) / 2) + Math.floor((owlWidth - OWL_FLIGHT_WIDTH) / 2)
-
-  // Skip the arrival theatrics when there is no room for a glide worth
-  // watching; the departure still plays from the perch.
+  // Skip the theatrics when there is no room for a glide worth watching.
   const fly = !flownThisLaunch && props.width() >= owlWidth + OWL_FLIGHT_WIDTH * 2
   flownThisLaunch = true
 
-  type Phase = "arrive" | "perch" | "depart" | "gone"
-  const [phase, setPhase] = createSignal<Phase>(fly ? "arrive" : "perch")
-  const [step, setStep] = createSignal(0)
-  // Where a departure starts from: the perch, or mid-air when triggered
-  // during the arrival.
-  let departFromX = perchX()
-  let lastX = fly ? -OWL_FLIGHT_WIDTH : perchX()
-
-  let timer: ReturnType<typeof setInterval> | undefined
-  const stopTimer = () => {
-    if (timer) clearInterval(timer)
-    timer = undefined
-  }
-  onCleanup(stopTimer)
-
-  const beginPhase = (next: "arrive" | "depart") => {
-    stopTimer()
-    setStep(0)
-    setPhase(next)
-    const steps = next === "arrive" ? ARRIVE_STEPS : DEPART_STEPS
-    timer = setInterval(() => {
+  const [step, setStep] = createSignal(fly ? 0 : ARRIVE_STEPS)
+  if (fly) {
+    const timer = setInterval(() => {
       setStep((value) => {
-        if (value + 1 >= steps) {
-          stopTimer()
-          setPhase(next === "arrive" ? "perch" : "gone")
-        }
+        if (value + 1 >= ARRIVE_STEPS) clearInterval(timer)
         return value + 1
       })
     }, FLIGHT_STEP_MS)
     timer.unref?.()
+    onCleanup(() => clearInterval(timer))
   }
-  if (fly) beginPhase("arrive")
-
-  createEffect(() => {
-    if (!props.depart?.()) return
-    const current = phase()
-    if (current === "depart" || current === "gone") return
-    departFromX = current === "perch" ? perchX() : lastX
-    beginPhase("depart")
-  })
+  const landed = createMemo(() => step() >= ARRIVE_STEPS)
 
   const scene = createMemo(() => {
-    const width = sceneWidth()
-    if (phase() === "arrive") {
-      // Glide from off-screen top-left to the perch, settling level with the
-      // owl's body for a same-size sprite-to-perch handoff.
-      const t = step() / ARRIVE_STEPS
-      const x = Math.round(-OWL_FLIGHT_WIDTH + (perchX() + OWL_FLIGHT_WIDTH) * t)
-      lastX = x
-      return flightScene(width, owlHeight, x, Math.round(perchY * t), owlFlightFrame(step()))
-    }
-    // Departure: lift off the perch and accelerate out past the right edge.
-    const t = step() / DEPART_STEPS
-    const x = Math.round(departFromX + (width - departFromX) * t * t)
-    const y = step() < 2 ? perchY : 0
+    const width = Math.max(props.width(), owlWidth)
+    // Glide from off-screen top-left to the perch, settling level with the
+    // owl's body for a same-size sprite-to-perch handoff.
+    const endX = Math.floor((width - owlWidth) / 2) + Math.floor((owlWidth - OWL_FLIGHT_WIDTH) / 2)
+    const endY = owlHeight - OWL_FLIGHT_HEIGHT
+    const t = step() / ARRIVE_STEPS
+    const x = Math.round(-OWL_FLIGHT_WIDTH + (endX + OWL_FLIGHT_WIDTH) * t)
+    const y = Math.round(endY * t)
     return flightScene(width, owlHeight, x, y, owlFlightFrame(step()))
   })
 
   return (
-    <Switch>
-      <Match when={phase() === "perch"}>
-        <AthenaPerchedOwl color={props.color} faceColor={props.faceColor} initialAlert={fly} />
-      </Match>
-      <Match when={phase() === "gone"}>
-        <box height={owlHeight} flexShrink={0} />
-      </Match>
-      <Match when={true}>
-        <box flexDirection="column" flexShrink={0}>
-          <For each={scene()}>
-            {(line) => (
-              <text fg={props.color} wrapMode="none" selectable={false}>
-                {line}
-              </text>
-            )}
-          </For>
-        </box>
-      </Match>
-    </Switch>
+    <Show
+      when={!landed()}
+      fallback={<AthenaPerchedOwl color={props.color} faceColor={props.faceColor} initialAlert={fly} />}
+    >
+      <box flexDirection="column" flexShrink={0}>
+        <For each={scene()}>
+          {(line) => (
+            <text fg={props.color} wrapMode="none" selectable={false}>
+              {line}
+            </text>
+          )}
+        </For>
+      </box>
+    </Show>
+  )
+}
+
+// The send-off — registered in the `app` slot so it overlays whatever route
+// is showing and survives the home screen unmounting. When the user submits
+// their first message the route flips home → session; the owl, gone with the
+// masthead, reappears crossing the top of the new session screen and
+// accelerates off the right edge, carrying the message away. Once per launch.
+export function AthenaDepartureFlight(props: { color: () => RGBA }) {
+  const route = useRoute()
+  const dimensions = useTerminalDimensions()
+  const [step, setStep] = createSignal(-1)
+  let previous = route.data.type
+  let flown = false
+  let timer: ReturnType<typeof setInterval> | undefined
+  onCleanup(() => timer && clearInterval(timer))
+
+  createEffect(() => {
+    const current = route.data.type
+    const from = previous
+    previous = current
+    // Only the first hop out of the home screen — a resumed session at
+    // startup or later navigation doesn't send the owl off again.
+    if (flown || current !== "session" || from !== "home") return
+    flown = true
+    setStep(0)
+    timer = setInterval(() => {
+      setStep((value) => {
+        if (value + 1 >= DEPART_STEPS && timer) clearInterval(timer)
+        return value + 1
+      })
+    }, FLIGHT_STEP_MS)
+    timer.unref?.()
+  })
+
+  const active = createMemo(() => step() >= 0 && step() < DEPART_STEPS)
+  const flight = createMemo(() => {
+    const width = dimensions().width
+    const start = Math.floor((width - OWL_FLIGHT_WIDTH) / 2)
+    const t = Math.max(step(), 0) / DEPART_STEPS
+    const x = Math.round(start + (width - start) * t * t)
+    // Clip at the right edge ourselves so the absolute box never reaches
+    // outside the screen.
+    const visible = Math.max(0, Math.min(OWL_FLIGHT_WIDTH, width - x))
+    return { x, lines: visible > 0 ? owlFlightFrame(step()).map((line) => line.slice(0, visible)) : [] }
+  })
+
+  // The box always renders: a slot entry whose initial render produces no
+  // output is dropped by the slot host for good (hasInitialOutput), so the
+  // idle state is a zero-size box rather than nothing.
+  const visible = createMemo(() => active() && flight().lines.length > 0)
+  return (
+    <box
+      position="absolute"
+      top={1}
+      left={visible() ? flight().x : 0}
+      width={visible() ? flight().lines[0].length : 0}
+      height={visible() ? OWL_FLIGHT_HEIGHT : 0}
+      zIndex={5500}
+      flexDirection="column"
+      flexShrink={0}
+    >
+      <Show when={visible()}>
+        <For each={flight().lines}>
+          {(line) => (
+            <text fg={props.color()} wrapMode="none" selectable={false}>
+              {line}
+            </text>
+          )}
+        </For>
+      </Show>
+    </box>
   )
 }
