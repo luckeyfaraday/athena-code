@@ -3,13 +3,16 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
+  continueLocalAgent,
   localAgentCommand,
+  localAgentContinueCommand,
   localAgentInteractiveCommand,
   localAgentResumeCommand,
   messageLocalAgent,
   readLocalAgentOutput,
   registerVisibleAgent,
   resolveLocalAgentSessionId,
+  respawnLocalAgent,
   spawnLocalAgentCommand,
   waitLocalAgent,
 } from "../overlay/packages/opencode/src/session/agent/local"
@@ -143,6 +146,75 @@ test("opencode session id resolves via title marker in opencode.db", async () =>
     if (previous === undefined) delete process.env.ATHENA_SCAN_OPENCODE_DB
     else process.env.ATHENA_SCAN_OPENCODE_DB = previous
   }
+})
+
+test("continue commands resume the same session with a follow-up prompt", () => {
+  expect(localAgentContinueCommand("claude", "sid", "do more", "/ws")).toEqual({
+    command: "claude",
+    args: ["-p", "--resume", "sid", "do more"],
+  })
+  // codex exec resume has no --cd flag; the spawn cwd carries the workspace.
+  expect(localAgentContinueCommand("codex", "sid", "do more", "/ws")).toEqual({
+    command: "codex",
+    args: ["exec", "resume", "sid", "do more"],
+  })
+  expect(localAgentContinueCommand("opencode", "sid", "do more", "/ws")).toEqual({
+    command: "opencode",
+    args: ["run", "--dir", "/ws", "--session", "sid", "do more"],
+  })
+  expect(localAgentContinueCommand("hermes", "sid", "do more", "/ws")).toEqual({
+    command: "hermes",
+    args: ["chat", "--resume", "sid", "--query", "do more"],
+  })
+})
+
+test("respawn reuses the handle and appends to the same output buffer", async () => {
+  const record = spawnLocalAgentCommand({
+    agent: "codex",
+    task: "first run",
+    workspace: workspace("athagent-"),
+    command: process.execPath,
+    args: ["-e", "process.stdout.write('first')"],
+  })
+  await waitLocalAgent(record.handle, 5000)
+  expect(record.exitedAt).toBeDefined()
+
+  respawnLocalAgent(record, { command: process.execPath, args: ["-e", "process.stdout.write('second')"] }, "follow-up task")
+  expect(record.exitedAt).toBeUndefined()
+  const done = await waitLocalAgent(record.handle, 5000)
+
+  expect(done?.exitCode).toBe(0)
+  expect(record.stdout).toBe("first\n----- follow-up: follow-up task\nsecond")
+})
+
+test("continueLocalAgent reports mid-run one-shots and unknown sessions", async () => {
+  const running = spawnLocalAgentCommand({
+    agent: "codex",
+    task: "long run",
+    workspace: workspace("athagent-"),
+    command: process.execPath,
+    args: ["-e", "setTimeout(() => {}, 3000)"],
+  })
+  expect((await continueLocalAgent(running.handle, "too early")).status).toBe("running")
+  running.process?.kill("SIGKILL")
+  await waitLocalAgent(running.handle, 5000)
+  // Exited with no session id captured: cannot be resumed.
+  expect((await continueLocalAgent(running.handle, "now what")).status).toBe("no-session")
+  expect((await continueLocalAgent("codex#999", "ghost")).status).toBe("missing")
+})
+
+test("continueLocalAgent writes to stdin when the agent keeps it open", async () => {
+  const record = spawnLocalAgentCommand({
+    agent: "claude",
+    task: "echo stdin",
+    workspace: workspace("athagent-"),
+    command: process.execPath,
+    args: ["-e", "process.stdin.on('data', (d) => { process.stdout.write('got:' + d); process.exit(0) })"],
+    keepStdinOpen: true,
+  })
+  expect((await continueLocalAgent(record.handle, "hi")).status).toBe("stdin")
+  const done = await waitLocalAgent(record.handle, 5000)
+  expect(done?.stdout).toBe("got:hi\n")
 })
 
 test("visible agents are listed but not messageable", () => {

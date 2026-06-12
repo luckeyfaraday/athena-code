@@ -102,6 +102,29 @@ export function localAgentInteractiveCommand(
   return { command: "hermes", args: ["chat"], promptInjected: false }
 }
 
+// Headless continuation: resume the agent's existing session one-shot with a
+// follow-up prompt. This is how agent_message reaches one-shot agents whose
+// stdin is closed (or already exited), including sessions the user advanced
+// interactively via agent_takeover — the same session id picks up the whole
+// conversation. codex's exec resume has no --cd; the spawn cwd covers it.
+export function localAgentContinueCommand(
+  agent: LocalAgentKind,
+  sessionId: string,
+  task: string,
+  workspace: string,
+): { command: string; args: string[] } {
+  switch (agent) {
+    case "claude":
+      return { command: "claude", args: ["-p", "--resume", sessionId, task] }
+    case "codex":
+      return { command: "codex", args: ["exec", "resume", sessionId, task] }
+    case "opencode":
+      return { command: "opencode", args: ["run", "--dir", workspace, "--session", sessionId, task] }
+    case "hermes":
+      return { command: "hermes", args: ["chat", "--resume", sessionId, "--query", task] }
+  }
+}
+
 // Native resume invocation per agent, mirroring the TUI's /find-sessions
 // resume table (packages/tui/src/util/athena-sessions.ts).
 export function localAgentResumeCommand(
@@ -156,6 +179,41 @@ function allocHandle(agent: LocalAgentKind): string {
   return `${agent}#${counts[agent]}`
 }
 
+// Wire a freshly spawned child into a record: buffer its output, capture the
+// session id as it streams, and mark the record exited on close. Shared by
+// the initial spawn and headless continuations under the same handle.
+function attachProcess(record: LocalAgentRecord, child: ChildProcessWithoutNullStreams, keepStdinOpen?: boolean): void {
+  record.pid = child.pid
+  record.process = child
+  record.exitedAt = undefined
+  record.exitCode = undefined
+  record.signal = undefined
+
+  // One-shot commands take the task as an argument; close stdin so CLIs that
+  // also read piped stdin to EOF (codex exec appends it as a <stdin> block,
+  // claude -p stalls 3s waiting for it) don't hang or delay.
+  child.stdin.on("error", () => {})
+  if (!keepStdinOpen) child.stdin.end()
+
+  child.stdout.on("data", (chunk) => {
+    appendBounded(record, "stdout", chunk.toString("utf8"))
+    captureSessionId(record)
+  })
+  child.stderr.on("data", (chunk) => {
+    appendBounded(record, "stderr", chunk.toString("utf8"))
+    captureSessionId(record)
+  })
+  child.on("error", (error) => {
+    appendBounded(record, "stderr", `${error.message}\n`)
+  })
+  child.on("close", (code, signal) => {
+    record.exitCode = code
+    record.signal = signal
+    record.exitedAt = new Date().toISOString()
+    delete record.process
+  })
+}
+
 export function spawnLocalAgentCommand(params: {
   agent: LocalAgentKind
   task: string
@@ -190,32 +248,47 @@ export function spawnLocalAgentCommand(params: {
     process: child,
   }
   agents.set(handle, record)
-
-  // One-shot commands take the task as an argument; close stdin so CLIs that
-  // also read piped stdin to EOF (codex exec appends it as a <stdin> block,
-  // claude -p stalls 3s waiting for it) don't hang or delay.
-  child.stdin.on("error", () => {})
-  if (!params.keepStdinOpen) child.stdin.end()
-
-  child.stdout.on("data", (chunk) => {
-    appendBounded(record, "stdout", chunk.toString("utf8"))
-    captureSessionId(record)
-  })
-  child.stderr.on("data", (chunk) => {
-    appendBounded(record, "stderr", chunk.toString("utf8"))
-    captureSessionId(record)
-  })
-  child.on("error", (error) => {
-    appendBounded(record, "stderr", `${error.message}\n`)
-  })
-  child.on("close", (code, signal) => {
-    record.exitCode = code
-    record.signal = signal
-    record.exitedAt = new Date().toISOString()
-    delete record.process
-  })
-
+  attachProcess(record, child, params.keepStdinOpen)
   return record
+}
+
+// Run a follow-up command under an existing exited record (same handle, same
+// buffers). A marker line separates the runs in the captured stdout so
+// agent_output readers can tell the turns apart.
+export function respawnLocalAgent(
+  record: LocalAgentRecord,
+  spec: { command: string; args: string[] },
+  task: string,
+): void {
+  appendBounded(record, "stdout", `\n----- follow-up: ${task}\n`)
+  record.command = spec.command
+  record.args = spec.args
+  record.visible = false
+  const child = spawn(spec.command, spec.args, {
+    cwd: record.workspace,
+    env: process.env,
+    stdio: "pipe",
+  })
+  attachProcess(record, child)
+}
+
+export type ContinueResult =
+  | { status: "missing" | "running" | "no-session" }
+  | { status: "stdin" | "resumed"; record: LocalAgentRecord }
+
+// Deliver a follow-up message to a spawned agent. Live agents with open stdin
+// get it written directly; exited (or visible-terminal) agents get their
+// session resumed headless with the message as the next prompt, under the
+// same handle. A headless agent that is still mid-run can't take either path.
+export async function continueLocalAgent(handle: string, text: string): Promise<ContinueResult> {
+  const record = agents.get(handle)
+  if (!record) return { status: "missing" }
+  if (messageLocalAgent(handle, text)) return { status: "stdin", record }
+  if (record.process) return { status: "running" }
+  const sessionId = await resolveLocalAgentSessionId(record)
+  if (!sessionId) return { status: "no-session" }
+  respawnLocalAgent(record, localAgentContinueCommand(record.agent, sessionId, text, record.workspace), text)
+  return { status: "resumed", record }
 }
 
 export function listLocalAgents(): LocalAgentRecord[] {

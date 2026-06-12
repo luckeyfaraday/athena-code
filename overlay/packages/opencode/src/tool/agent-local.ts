@@ -3,11 +3,11 @@ import { tool } from "@opencode-ai/plugin"
 import { GlobalBus } from "../bus/global"
 import { normalizeWorktree } from "../plugin/workspace"
 import {
+  continueLocalAgent,
   getLocalAgent,
   listLocalAgents,
   localAgentInteractiveCommand,
   localAgentResumeCommand,
-  messageLocalAgent,
   readLocalAgentOutput,
   registerVisibleAgent,
   resolveLocalAgentSessionId,
@@ -156,7 +156,7 @@ export const AgentTakeoverTool = tool({
     return {
       title: "Handing over session",
       metadata: { handle: record.handle, sessionId },
-      output: `Handing this terminal over to ${record.agent} session ${sessionId}. Athena Code returns when the user exits ${record.agent}. If nothing happens (e.g. no TUI attached), the user can run /find-sessions instead.`,
+      output: `Handing this terminal over to ${record.agent} session ${sessionId}. Athena Code returns when the user exits ${record.agent}; after that, agent_message ${record.handle} continues the same session (including the user's interactive turns). If nothing happens (e.g. no TUI attached), the user can run /find-sessions instead.`,
     }
   },
 })
@@ -171,14 +171,38 @@ export const AgentListTool = tool({
 })
 
 export const AgentMessageTool = tool({
-  description: "Send a follow-up instruction over stdin to a running local agent spawned by Athena Code. Note: agents spawned by agent_spawn run one-shot commands with stdin closed and cannot be messaged; this only works for custom-command agents that keep stdin open.",
+  description:
+    "Send a follow-up instruction to a local agent spawned by Athena Code. Running agents that keep stdin open get it directly; exited one-shot agents (including sessions the user worked in after agent_takeover) have their session resumed headless with the message as the next prompt, under the same handle — use agent_output/agent_wait to read the response.",
   args: {
     handle: tool.schema.string().describe('Agent handle, for example "claude#1" or "codex#1".'),
-    text: tool.schema.string().describe("Message to send to the agent over stdin."),
+    text: tool.schema.string().describe("Message or follow-up task to send to the agent."),
   },
   async execute(args) {
-    const ok = messageLocalAgent(args.handle, args.text)
-    return { title: ok ? "Agent messaged" : "Agent not accepting input", metadata: { handle: args.handle, ok }, output: ok ? `Sent message to ${args.handle}.` : `${args.handle} does not exist, has exited, or runs a one-shot command with stdin closed.` }
+    const result = await continueLocalAgent(args.handle, args.text)
+    switch (result.status) {
+      case "missing":
+        return { title: "Agent not found", metadata: { error: true, handle: args.handle }, output: `${args.handle} does not exist.` }
+      case "running":
+        return {
+          title: "Agent still running",
+          metadata: { error: true, handle: args.handle },
+          output: `${args.handle} is a one-shot agent that is still mid-run; its stdin is closed and its session cannot be resumed until it finishes. Use agent_wait first, then send the follow-up.`,
+        }
+      case "no-session":
+        return {
+          title: "Session id unknown",
+          metadata: { error: true, handle: args.handle },
+          output: `${args.handle} has exited but its session id could not be determined, so the conversation cannot be resumed.`,
+        }
+      case "stdin":
+        return { title: "Agent messaged", metadata: { handle: args.handle, via: "stdin" }, output: `Sent message to ${args.handle} over stdin.` }
+      case "resumed":
+        return {
+          title: "Session resumed with follow-up",
+          metadata: { handle: args.handle, via: "resume", sessionId: result.record.sessionId, pid: result.record.pid },
+          output: `Resumed ${result.record.agent} session ${result.record.sessionId} headless with the follow-up prompt (same handle ${args.handle}; it picks up everything in the session, including turns the user added after a takeover). Use agent_output or agent_wait to read the response. If the user is still working in that session interactively, warn them before sending more.`,
+        }
+    }
   },
 })
 
