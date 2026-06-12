@@ -2,6 +2,14 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { MemoryWriteTool } from "../tool/memory-write"
 import { MemoryReadTool } from "../tool/memory-read"
 import { SessionRecallTool } from "../tool/session-recall"
+import {
+  AgentListTool,
+  AgentMessageTool,
+  AgentOutputTool,
+  AgentSpawnTool,
+  AgentStopTool,
+  AgentWaitTool,
+} from "../tool/agent-local"
 import { frozenSnapshotSystem } from "../session/memory/snapshot"
 import { recallSystemEntry } from "../session/memory/recall"
 import { writeMemoryStatus } from "../session/memory/status"
@@ -38,6 +46,12 @@ export const AthenaPlugin: Plugin = async (input) => {
       memory_write: MemoryWriteTool,
       memory_read: MemoryReadTool,
       session_recall: SessionRecallTool,
+      agent_spawn: AgentSpawnTool,
+      agent_list: AgentListTool,
+      agent_message: AgentMessageTool,
+      agent_stop: AgentStopTool,
+      agent_output: AgentOutputTool,
+      agent_wait: AgentWaitTool,
     },
     "experimental.chat.messages.transform": async (_input, output) => {
       const msgs = output.messages
