@@ -15,6 +15,7 @@ import { DialogSelect, type DialogSelectOption } from "../ui/dialog-select"
 import { useToast } from "../ui/toast"
 import {
   listRecentSessions,
+  refreshSessionIndex,
   resumeCommand,
   searchSessions,
   type AthenaSessionEntry,
@@ -45,6 +46,8 @@ export function DialogAthenaSessions() {
   // compiled binaries, where the build's conditions:["node"] resolves
   // solid-js/web to its server bundle and isServer is permanently true.
   const [search, setSearchNow] = createSignal("")
+  const [refreshing, setRefreshing] = createSignal(false)
+  const [refreshVersion, setRefreshVersion] = createSignal(0)
   let searchTimer: ReturnType<typeof setTimeout> | undefined
   const setSearch = (value: string) => {
     clearTimeout(searchTimer)
@@ -53,6 +56,7 @@ export function DialogAthenaSessions() {
   onCleanup(() => clearTimeout(searchTimer))
 
   const entries = createMemo(() => {
+    refreshVersion()
     const query = search().trim()
     return query ? searchSessions(query, SEARCH_LIMIT) : listRecentSessions(BROWSE_LIMIT)
   })
@@ -119,11 +123,17 @@ export function DialogAthenaSessions() {
 
   onMount(() => {
     dialog.setSize("large")
+    setRefreshing(true)
+    refreshSessionIndex()
+      .then((started) => {
+        if (started) setRefreshVersion((version) => version + 1)
+      })
+      .finally(() => setRefreshing(false))
   })
 
   return (
     <DialogSelect
-      title="Find sessions across agents"
+      title={refreshing() ? "Find sessions across agents · updating index" : "Find sessions across agents"}
       options={options()}
       skipFilter={true}
       onFilter={setSearch}

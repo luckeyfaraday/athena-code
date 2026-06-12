@@ -1,8 +1,10 @@
-// Read-only TUI-side browser over athena-code's cross-agent session index
+// TUI-side browser over athena-code's cross-agent session index
 // (~/.athena-code/context/sessions.db, written by the opencode-side indexer in
 // session/memory/sessionindex.ts and the background scanner in agentscan.ts).
-// The TUI package cannot import from packages/opencode, so the path, schema
-// guard, and FTS quoting are mirrored here; this module never writes.
+// The TUI package does not statically import from packages/opencode, so the
+// path, schema guard, and FTS quoting are mirrored here; normal list/search
+// operations stay read-only, while /find-sessions can request a throttled
+// scanner refresh.
 
 import { Database } from "bun:sqlite"
 import { existsSync, statSync } from "node:fs"
@@ -11,6 +13,7 @@ import { join, resolve } from "node:path"
 
 const SCHEMA_VERSION = 3
 const TITLE_MAX = 120
+const FIND_SESSIONS_REFRESH_INTERVAL_MS = 30_000
 
 export interface AthenaSessionEntry {
   agent: string
@@ -184,6 +187,19 @@ export function searchSessions(query: string, limit = 50): AthenaSessionEntry[] 
     return out
   } finally {
     db.close()
+  }
+}
+
+// /find-sessions is the strongest signal that freshness matters. Keep normal
+// browsing/search read-only, but ask the shared scanner for a throttled refresh
+// when the dialog opens and let the caller repaint when it settles.
+export async function refreshSessionIndex(minIntervalMs = FIND_SESSIONS_REFRESH_INTERVAL_MS): Promise<boolean> {
+  try {
+    const { scheduleAgentScan } = await import("../../../opencode/src/session/memory/agentscan")
+    const result = await scheduleAgentScan({ minIntervalMs })
+    return result !== null
+  } catch {
+    return false
   }
 }
 
