@@ -7,18 +7,16 @@
 // carry the expression.
 
 import type { RGBA } from "@opentui/core"
-import { For, createSignal, onCleanup } from "solid-js"
-import { OWL_FACE_ROW, owlLines, type OwlState } from "../util/athena-identity"
+import { For, createSignal, onCleanup, type Accessor } from "solid-js"
+import { OWL_FACE_ROW, OWL_GRAND_FACE_ROWS, owlGrandLines, owlLines, type OwlState } from "../util/athena-identity"
 
 const BLINK_MS = 140
 const BLINK_MIN_GAP_MS = 6_000
 const BLINK_MAX_GAP_MS = 14_000
 const WING_TICK_MS = 400
 
-export function AthenaOwl(props: { state: () => OwlState; color: RGBA; faceColor?: RGBA }) {
+function createBlink(): Accessor<boolean> {
   const [blink, setBlink] = createSignal(false)
-  const [tick, setTick] = createSignal(false)
-
   let blinkTimer: ReturnType<typeof setTimeout>
   const scheduleBlink = () => {
     const gap = BLINK_MIN_GAP_MS + Math.random() * (BLINK_MAX_GAP_MS - BLINK_MIN_GAP_MS)
@@ -32,13 +30,17 @@ export function AthenaOwl(props: { state: () => OwlState; color: RGBA; faceColor
     blinkTimer.unref?.()
   }
   scheduleBlink()
+  onCleanup(() => clearTimeout(blinkTimer))
+  return blink
+}
+
+export function AthenaOwl(props: { state: () => OwlState; color: RGBA; faceColor?: RGBA }) {
+  const blink = createBlink()
+  const [tick, setTick] = createSignal(false)
 
   const wingTimer = setInterval(() => setTick((value) => !value), WING_TICK_MS)
   wingTimer.unref?.()
-  onCleanup(() => {
-    clearTimeout(blinkTimer)
-    clearInterval(wingTimer)
-  })
+  onCleanup(() => clearInterval(wingTimer))
 
   const lines = () => owlLines(props.state(), blink(), tick())
   return (
@@ -46,6 +48,27 @@ export function AthenaOwl(props: { state: () => OwlState; color: RGBA; faceColor
       <For each={lines()}>
         {(line, index) => (
           <text fg={index() === OWL_FACE_ROW ? (props.faceColor ?? props.color) : props.color} selectable={false}>
+            {line}
+          </text>
+        )}
+      </For>
+    </box>
+  )
+}
+
+// The full perched owl for tall home screens — same companion, grown up.
+// Idle by nature (it lives on the idle screen), so it only blinks.
+export function AthenaGrandOwl(props: { color: RGBA; faceColor?: RGBA }) {
+  const blink = createBlink()
+  const lines = () => owlGrandLines(blink())
+  return (
+    <box flexDirection="column" flexShrink={0}>
+      <For each={lines()}>
+        {(line, index) => (
+          <text
+            fg={OWL_GRAND_FACE_ROWS.includes(index()) ? (props.faceColor ?? props.color) : props.color}
+            selectable={false}
+          >
             {line}
           </text>
         )}

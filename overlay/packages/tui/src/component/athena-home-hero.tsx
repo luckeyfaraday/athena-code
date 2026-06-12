@@ -7,10 +7,11 @@
 import { For, Show, createMemo } from "solid-js"
 import { useTerminalDimensions } from "@opentui/solid"
 import { useTheme } from "../context/theme"
-import { markLines } from "../util/athena-identity"
+import { markLines, meanderLine } from "../util/athena-identity"
 import { Logo } from "./logo"
 
-const RULE = "─".repeat(15) + " ◆ " + "─".repeat(15)
+// 33 = 4k+1 so the Greek-key run ends on a clean ─ at both edges.
+const RULE = meanderLine(33)
 
 export function AthenaHomeHero() {
   const theme = useTheme().theme

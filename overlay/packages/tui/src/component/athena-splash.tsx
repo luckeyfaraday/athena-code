@@ -1,7 +1,7 @@
 import { TextAttributes } from "@opentui/core"
 import { For, Show, createMemo, createSignal, onCleanup } from "solid-js"
 import { useTheme } from "../context/theme"
-import { markLines } from "../util/athena-identity"
+import { markLines, meanderLine } from "../util/athena-identity"
 import { Logo } from "./logo"
 
 // Athena splash — a branded loading screen shown while the TUI plugin host
@@ -74,6 +74,9 @@ export function AthenaSplash(props: { ready: () => boolean }) {
           <box flexDirection="column" alignItems="center" flexShrink={0} paddingTop={1}>
             <text fg={theme.textMuted} selectable={false}>
               c o m m a n d   r o o m
+            </text>
+            <text fg={theme.border} selectable={false}>
+              {meanderLine(29)}
             </text>
             <text fg={theme.textMuted} selectable={false}>
               summoning the command room{dots()}

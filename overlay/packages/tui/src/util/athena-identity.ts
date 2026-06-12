@@ -52,6 +52,34 @@ export function dailyAphorism(date = new Date()): Aphorism {
   return APHORISMS[day % APHORISMS.length]
 }
 
+// --- the weave ---------------------------------------------------------------
+
+// Athena's working animation: a shuttle carrying the weft across the warp.
+// The thread behind the shuttle is woven, the warp ahead is bare; at the far
+// selvedge it pauses, runs home along the finished row, and the next row
+// begins. Pure frame strings so tests can pin the loom; the per-glyph colors
+// live in util/athena-weave.ts.
+export const WEAVE_SHUTTLE = "◆"
+export const WEAVE_WOVEN = "─"
+export const WEAVE_BARE = "╌"
+
+export function weaveFrames(width = 8, holdHome = 5, holdFar = 3): string[] {
+  const frames: string[] = []
+  for (let i = 0; i < width; i++) {
+    frames.push(WEAVE_WOVEN.repeat(i) + WEAVE_SHUTTLE + WEAVE_BARE.repeat(width - 1 - i))
+  }
+  for (let i = 0; i < holdFar; i++) {
+    frames.push(WEAVE_WOVEN.repeat(width - 1) + WEAVE_SHUTTLE)
+  }
+  for (let i = width - 2; i >= 0; i--) {
+    frames.push(WEAVE_WOVEN.repeat(i) + WEAVE_SHUTTLE + WEAVE_WOVEN.repeat(width - 1 - i))
+  }
+  for (let i = 0; i < holdHome; i++) {
+    frames.push(WEAVE_SHUTTLE + WEAVE_BARE.repeat(width - 1))
+  }
+  return frames
+}
+
 // --- the mark ---------------------------------------------------------------
 
 // Six spokes of the Athena mark as (row-step, col-step, glyph). Columns step
@@ -80,6 +108,19 @@ export function markLines(grown: number, spokeLen = 3): string[] {
   return grid.map((row) => row.join(""))
 }
 
+// --- the meander -------------------------------------------------------------
+
+// The signature horizontal motif (docs/ui-identity-design.md §5): a
+// crenellated Greek-key run used where upstream draws a plain rule. Position
+// i mod 4 walks ─ ┐ ␣ ┌, so widths of 4k+1 end on a clean ─.
+const MEANDER = ["─", "┐", " ", "┌"] as const
+
+export function meanderLine(width: number): string {
+  let out = ""
+  for (let i = 0; i < width; i++) out += MEANDER[i % MEANDER.length]
+  return out
+}
+
 // --- the owl ---------------------------------------------------------------
 
 export type OwlState = "idle" | "thinking" | "working"
@@ -93,4 +134,28 @@ export function owlLines(state: OwlState, blink = false, tick = false): string[]
   const face = state === "thinking" || blink ? "(-,-)" : "(o,o)"
   const wing = state === "working" && tick ? "/)_)~" : "/)_)"
   return [",___,", face, wing, `-"-"-`]
+}
+
+// --- the grand owl -----------------------------------------------------------
+
+// The full perched owl for the home screen when the terminal is tall enough:
+// ear tufts, brow, eyes (the blink rows), beak, folded wings over a feathered
+// chest, tail, perch. Every line is padded to the same width so a centering
+// container cannot shear rows of different parity. Rendered by
+// component/athena-owl.tsx, which lights the face rows brighter than the body.
+export const OWL_GRAND_FACE_ROWS: ReadonlyArray<number> = [2, 3]
+
+export function owlGrandLines(blink = false): string[] {
+  const eyes = blink ? "( -   - )" : "( o   o )"
+  return [
+    "  ,_,   ,_,  ",
+    "  \\ \\___/ /  ",
+    `  ${eyes}  `,
+    "   (  v  )   ",
+    "  /|`---'|\\  ",
+    " ( |^ ^ ^| ) ",
+    "  \\|^ ^ ^|/  ",
+    "    |___|    ",
+    `   -"---"-   `,
+  ]
 }

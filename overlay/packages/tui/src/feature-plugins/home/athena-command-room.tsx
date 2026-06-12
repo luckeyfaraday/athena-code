@@ -7,12 +7,17 @@
 
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { useTerminalDimensions } from "@opentui/solid"
 import { useTuiPaths } from "../../context/runtime"
-import { AthenaOwl } from "../../component/athena-owl"
+import { AthenaGrandOwl, AthenaOwl } from "../../component/athena-owl"
 import { archiveStats, type ArchiveStats } from "../../util/athena-sessions"
 import { dailyAphorism } from "../../util/athena-identity"
 
 const STATS_REFRESH_MS = 30_000
+
+// Terminal rows needed before the grand owl joins the command room without
+// pushing the prompt or footer off screen (hero + prompt + rows + footer).
+const GRAND_OWL_MIN_ROWS = 42
 
 function formatCount(value: number): string {
   return value.toLocaleString("en-US")
@@ -21,6 +26,8 @@ function formatCount(value: number): string {
 export function AthenaCommandRoom(props: { api: TuiPluginApi }) {
   const theme = () => props.api.theme.current
   const paths = useTuiPaths()
+  const dimensions = useTerminalDimensions()
+  const grand = createMemo(() => dimensions().height >= GRAND_OWL_MIN_ROWS)
   const directory = createMemo(() => props.api.state.path.directory || paths.cwd)
 
   const [stats, setStats] = createSignal<ArchiveStats | null>(null)
@@ -70,12 +77,24 @@ export function AthenaCommandRoom(props: { api: TuiPluginApi }) {
         <Show when={rows().length > 0}>
           <text> </text>
         </Show>
-        <box flexDirection="row" gap={2} alignItems="center">
-          <AthenaOwl state={() => "idle"} color={theme().textMuted} faceColor={theme().text} />
-          <text fg={theme().textMuted} wrapMode="none">
-            “{maxim.text}” — {maxim.source}
-          </text>
-        </box>
+        <Show
+          when={grand()}
+          fallback={
+            <box flexDirection="row" gap={2} alignItems="center">
+              <AthenaOwl state={() => "idle"} color={theme().textMuted} faceColor={theme().text} />
+              <text fg={theme().textMuted} wrapMode="none">
+                “{maxim.text}” — {maxim.source}
+              </text>
+            </box>
+          }
+        >
+          <box flexDirection="column" alignItems="center" gap={1}>
+            <AthenaGrandOwl color={theme().textMuted} faceColor={theme().text} />
+            <text fg={theme().textMuted} wrapMode="none">
+              “{maxim.text}” — {maxim.source}
+            </text>
+          </box>
+        </Show>
       </box>
     </box>
   )
