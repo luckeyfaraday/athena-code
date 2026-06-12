@@ -11,9 +11,11 @@
 // randomized timer (and right after landing).
 //
 // The output frames are baked into util/athena-identity.ts as
-// OWL_PERCHED_RESTING / OWL_PERCHED_ALERT / OWL_FLIGHT_FRAMES — the stipple
-// is sampled from a seeded PRNG so a rerun reproduces the committed art
-// exactly; tweak the densities here, rerun, and re-bake to iterate.
+// OWL_PERCHED_RESTING / OWL_PERCHED_ALERT / OWL_FLIGHT_FRAMES. The perched
+// owl is thresholded through an ordered (Bayer) dither so its outline is a
+// continuous stroke and the interior texture is even; the flight sprite, on
+// screen only in motion, keeps the looser seeded-PRNG stipple. Both are fully
+// deterministic — tweak the densities here, rerun, and re-bake to iterate.
 
 const W = 24 // dot columns  (W/2 = 12 terminal columns)
 const H = 24 // dot rows     (H/4 = 6 terminal rows)
@@ -57,71 +59,90 @@ function segDist(x: number, y: number, a: number[], b: number[]) {
   return Math.hypot(x - px, y - py)
 }
 
+// One blended silhouette — head over body with ear tufts — so the bird is a
+// single connected form, not stacked blobs.
+function silhouette(x: number, y: number): boolean {
+  return (
+    ell(x, y, 12, 8, 6.2, 5.8) < 1 ||
+    ell(x, y, 12, 15.8, 8.6, 6.2) < 1 ||
+    inTriangle(x, y, [6.4, 5.2], [9, 3], [4, 0.6]) ||
+    inTriangle(x, y, [17.6, 5.2], [15, 3], [20, 0.6])
+  )
+}
+
 function density(x: number, y: number, alert: boolean): number {
   let d = 0
+  const head = ell(x, y, 12, 8, 6.2, 5.8)
 
-  // --- silhouette: head over a round body, form from edge-weighted density --
-  const head = ell(x, y, 12, 8, 8, 5.5)
-  const body = ell(x, y, 12, 16, 8.5, 6.5)
-  const tuftL = inTriangle(x, y, [4.5, 5], [9.5, 5], [7, 0.5])
-  const tuftR = inTriangle(x, y, [19.5, 5], [14.5, 5], [17, 0.5])
-  const inside = head < 1 || body < 1 || tuftL || tuftR
-
-  if (inside) {
-    // sparse interior, quietest inside the face so the eyes carry it
-    d = head < 0.85 ? 0.04 : 0.2
-    const shapes: Array<[number, number]> = [
-      [head, 6.5],
-      [body, 7.5],
-    ]
-    for (const [sd, r] of shapes) {
-      const edge = Math.abs(sd - 1) * r
-      if (edge < 1.6) {
-        // skip internal seams where one shape's edge is buried in another
-        const buried = (sd === head && body < 0.9) || (sd === body && head < 0.9)
-        if (!buried) d = Math.max(d, 0.95 * (1 - edge / 2.6))
-      }
+  if (silhouette(x, y)) {
+    // even, quiet texture on the body; the face stays clean so the brow,
+    // eyes, and beak carry it alone
+    d = head < 0.93 && y < 12.8 ? 0 : 0.12
+    // the outline: a one-dot rim wherever a neighboring dot falls outside the
+    // silhouette, tracing the whole bird as one continuous stroke
+    for (const [nx, ny] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+      [0.75, 0.75],
+      [-0.75, 0.75],
+      [0.75, -0.75],
+      [-0.75, -0.75],
+    ]) {
+      if (!silhouette(x + nx, y + ny)) d = 1
     }
-    if (tuftL || tuftR) d = Math.max(d, 0.8)
+    // folded wings: a stroke down each flank
+    if (segDist(x, y, [6.5, 14], [8.7, 19.8]) < 0.55) d = Math.max(d, 1)
+    if (segDist(x, y, [17.5, 14], [15.3, 19.8]) < 0.55) d = Math.max(d, 1)
   }
 
   // --- the face -------------------------------------------------------------
-  // heavy brow: a wide V from the tuft bases down between the eyes
-  if (segDist(x, y, [6, 4.5], [11, 7]) < 0.9) d = Math.max(d, 0.95)
-  if (segDist(x, y, [18, 4.5], [13, 7]) < 0.9) d = Math.max(d, 0.95)
-  for (const exOff of [-4, 4]) {
+  // the brow: a V over the eyes, dipping from the tuft bases to the beak root
+  if (segDist(x, y, [6.6, 5], [11.5, 7.4]) < 0.6) d = Math.max(d, 1)
+  if (segDist(x, y, [17.4, 5], [12.5, 7.4]) < 0.6) d = Math.max(d, 1)
+  for (const exOff of [-3, 3]) {
     if (alert) {
       // open: solid eyes — discs beat rings at this resolution
-      if (ell(x, y, 12 + exOff, 9.5, 2, 2) < 1) d = Math.max(d, 1)
+      if (ell(x, y, 12 + exOff, 9.8, 1.8, 1.8) < 1) d = Math.max(d, 1)
     } else {
       // resting: the sleepy crescent, an arc hugging the lower lid
-      const eye = ell(x, y, 12 + exOff, 9, 2.1, 2.1)
-      if (Math.abs(eye - 1) < 0.34 && y > 9.4 && y < 12.5) d = Math.max(d, 1)
+      const eye = ell(x, y, 12 + exOff, 9.4, 1.8, 2)
+      if (Math.abs(eye - 1) < 0.34 && y > 9.8 && y < 11.9) d = Math.max(d, 1)
     }
   }
   // beak
-  if (inTriangle(x, y, [10.9, 12], [13.1, 12], [12, 15])) d = Math.max(d, 0.8)
+  if (inTriangle(x, y, [10.8, 11.8], [13.2, 11.8], [12, 14.5])) d = Math.max(d, 0.95)
 
   // --- the perch: a branch under the talons ---------------------------------
-  if (segDist(x, y, [0.5, 22.8], [23.5, 21.4]) < 0.9) d = Math.max(d, 0.65)
-  // talons gripping the branch
+  if (segDist(x, y, [0.5, 23.3], [23.5, 22.3]) < 0.55) d = Math.max(d, 1)
+  // talons gripping the branch, bridging the body down to it
   for (const [fx, fy] of [
-    [8.5, 21.6],
-    [15.5, 21.2],
+    [8.5, 22],
+    [15.5, 21.7],
   ]) {
-    if (ell(x, y, fx, fy, 1.5, 1.2) < 1) d = Math.max(d, 0.9)
+    if (ell(x, y, fx, fy, 1.3, 1.1) < 1) d = Math.max(d, 1)
   }
 
   return d
 }
 
+// Ordered dithering for the perched owl: each density is thresholded against
+// a 4x4 Bayer matrix, so full-density strokes are continuous and the sparse
+// interior comes out as an even texture instead of random clumps.
+const BAYER = [
+  [0, 8, 2, 10],
+  [12, 4, 14, 6],
+  [3, 11, 1, 9],
+  [15, 7, 13, 5],
+]
+
 function render(alert: boolean): string[] {
-  const rand = prng(0x0a7e0a) // fixed seed: the committed art
   const dots: boolean[][] = []
   for (let y = 0; y < H; y++) {
     dots.push([])
     for (let x = 0; x < W; x++) {
-      dots[y].push(rand() < density(x + 0.5, y + 0.5, alert))
+      dots[y].push(density(x + 0.5, y + 0.5, alert) > (BAYER[y % 4][x % 4] + 0.5) / 16)
     }
   }
   const lines: string[] = []

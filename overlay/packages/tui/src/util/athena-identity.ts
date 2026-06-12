@@ -86,28 +86,28 @@ export function weaveFrames(width = 8, holdHome = 5, holdFar = 3): string[] {
 // dot-density stipple art on braille cells (each char a 2x4 dot grid): ear
 // tufts, a heavy brow, sleepy crescent eyes, talons on a branch. Sized to the
 // flight sprite below so the landing reads as the same bird folding its
-// wings. Baked by scripts/generate-braille-owl.ts (seeded, reproducible) —
-// regenerate there, never hand-edit dots. The resting frame has the eyes
+// wings. Baked by scripts/generate-braille-owl.ts (deterministic, ordered
+// dither) — regenerate there, never hand-edit dots. The resting frame has the eyes
 // closed to crescents; the alternate frame opens them — the owl glancing up
 // at you — shown on a rare randomized timer and right after landing.
 export const OWL_PERCHED_FACE_ROWS: ReadonlyArray<number> = [2]
 
 const OWL_PERCHED_RESTING: ReadonlyArray<string> = [
-  "⠀⠀⢀⣶⣀⢀⣀⣀⣴⡀⠀⠀",
-  "⠀⠀⣼⠍⠷⣬⣤⠾⠛⣧⠀⠀",
-  "⠀⠀⠻⣦⡴⠂⠐⢦⣴⠗⠀⠀",
-  "⠀⠀⢾⡡⠠⠘⠣⡈⡈⣱⠀⠀",
-  "⠀⠀⢂⡀⠨⠘⠀⠘⢜⡘⠀⠀",
-  "⠀⣄⠤⠙⠷⠇⠾⠻⠟⠶⠐⠚",
+  "⠀⠀⠲⡤⣀⠤⠤⣀⢤⠖⠀⠀",
+  "⠀⠀⠀⡗⠦⣄⣠⠴⢻⠀⠀⠀",
+  "⠀⠀⠀⡧⣀⠄⠠⣀⢼⠀⠀⠀",
+  "⠀⢀⠎⣆⠁⠌⠁⠄⣱⠵⡀⠀",
+  "⠀⠈⢧⡜⡅⠄⠁⢤⢃⡴⠁⠀",
+  "⣀⣀⣀⣽⡷⠶⠷⠾⠯⠤⠤⠤",
 ]
 
 const OWL_PERCHED_ALERT: ReadonlyArray<string> = [
-  "⠀⠀⢀⣶⣀⢀⣀⣀⣴⡀⠀⠀",
-  "⠀⠀⣼⠍⠷⣬⣤⠾⠛⣧⠀⠀",
-  "⠀⠀⠫⡿⠿⠀⠀⠿⢿⠕⠀⠀",
-  "⠀⠀⢾⡡⠠⠘⠣⡈⡈⣱⠀⠀",
-  "⠀⠀⢂⡀⠨⠘⠀⠘⢜⡘⠀⠀",
-  "⠀⣄⠤⠙⠷⠇⠾⠻⠟⠶⠐⠚",
+  "⠀⠀⠲⡤⣀⠤⠤⣀⢤⠖⠀⠀",
+  "⠀⠀⠀⡗⠦⣄⣠⠴⢻⠀⠀⠀",
+  "⠀⠀⠀⡷⣿⠆⠰⣿⢾⠀⠀⠀",
+  "⠀⢀⠎⣆⠁⠌⠁⠄⣱⠵⡀⠀",
+  "⠀⠈⢧⡜⡅⠄⠁⢤⢃⡴⠁⠀",
+  "⣀⣀⣀⣽⡷⠶⠷⠾⠯⠤⠤⠤",
 ]
 
 export function owlPerchedLines(alert = false): string[] {
