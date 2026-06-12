@@ -8,6 +8,7 @@ import {
   AgentOutputTool,
   AgentSpawnTool,
   AgentStopTool,
+  AgentTakeoverTool,
   AgentWaitTool,
 } from "../tool/agent-local"
 import { frozenSnapshotSystem } from "../session/memory/snapshot"
@@ -52,6 +53,7 @@ export const AthenaPlugin: Plugin = async (input) => {
       agent_stop: AgentStopTool,
       agent_output: AgentOutputTool,
       agent_wait: AgentWaitTool,
+      agent_takeover: AgentTakeoverTool,
     },
     "experimental.chat.messages.transform": async (_input, output) => {
       const msgs = output.messages

@@ -1,4 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
+import { randomUUID } from "node:crypto"
+import { existsSync } from "node:fs"
+import { homedir } from "node:os"
+import { join } from "node:path"
 
 export type LocalAgentKind = "claude" | "codex" | "opencode" | "hermes"
 
@@ -14,6 +18,16 @@ export type LocalAgentRecord = {
   exitedAt?: string
   exitCode?: number | null
   signal?: NodeJS.Signals | null
+  // The spawned agent's own session id, once known. claude gets one assigned
+  // up front (--session-id); codex and hermes print theirs and are captured
+  // from stdout as it streams; opencode is looked up lazily by title marker.
+  sessionId?: string
+  // Unique --title passed to `opencode run` so the session can be found in
+  // opencode.db afterwards.
+  sessionMarker?: string
+  // True when the agent runs interactively in its own terminal window: no
+  // stdout/stderr is captured and stdin cannot be messaged.
+  visible?: boolean
   stdout: string
   stderr: string
   // Characters trimmed from the front of each buffer once it exceeds
@@ -48,11 +62,63 @@ function appendBounded(record: LocalAgentRecord, channel: "stdout" | "stderr", c
 // All four agents run as one-shot, non-interactive commands. Notably, hermes
 // treats its first positional argument as a subcommand (the prompt goes through
 // `chat --query`), and opencode's run command takes `--dir`, not `--cwd`.
-export function localAgentCommand(agent: LocalAgentKind, task: string, workspace: string): { command: string; args: string[] } {
+//
+// Each command is shaped so the spawned agent's session id is recoverable for
+// agent_takeover: claude takes a pre-generated uuid, codex prints
+// "session id: <uuid>" in its exec banner, hermes (without -Q) prints
+// "Session: <id>" on exit, and opencode runs get a unique --title that is
+// looked up in opencode.db afterwards.
+export function localAgentCommand(
+  agent: LocalAgentKind,
+  task: string,
+  workspace: string,
+): { command: string; args: string[]; sessionId?: string; sessionMarker?: string } {
   if (agent === "codex") return { command: "codex", args: ["exec", "--cd", workspace, task] }
-  if (agent === "claude") return { command: "claude", args: ["-p", task] }
-  if (agent === "opencode") return { command: "opencode", args: ["run", "--dir", workspace, task] }
-  return { command: "hermes", args: ["chat", "-Q", "--query", task] }
+  if (agent === "claude") {
+    const sessionId = randomUUID()
+    return { command: "claude", args: ["-p", task, "--session-id", sessionId], sessionId }
+  }
+  if (agent === "opencode") {
+    const sessionMarker = `athena-spawn ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+    return { command: "opencode", args: ["run", "--dir", workspace, "--title", sessionMarker, task], sessionMarker }
+  }
+  return { command: "hermes", args: ["chat", "--query", task] }
+}
+
+// Interactive (own-terminal) invocation that starts the agent with the task
+// already submitted as the first prompt. Hermes has no interactive
+// initial-prompt mode, so it starts a plain chat instead.
+export function localAgentInteractiveCommand(
+  agent: LocalAgentKind,
+  task: string,
+  workspace: string,
+): { command: string; args: string[]; sessionId?: string; promptInjected: boolean } {
+  if (agent === "codex") return { command: "codex", args: ["--cd", workspace, task], promptInjected: true }
+  if (agent === "claude") {
+    const sessionId = randomUUID()
+    return { command: "claude", args: [task, "--session-id", sessionId], sessionId, promptInjected: true }
+  }
+  if (agent === "opencode") return { command: "opencode", args: [workspace, "--prompt", task], promptInjected: true }
+  return { command: "hermes", args: ["chat"], promptInjected: false }
+}
+
+// Native resume invocation per agent, mirroring the TUI's /find-sessions
+// resume table (packages/tui/src/util/athena-sessions.ts).
+export function localAgentResumeCommand(
+  agent: LocalAgentKind,
+  sessionId: string,
+  workspace: string,
+): { command: string; args: string[] } {
+  switch (agent) {
+    case "claude":
+      return { command: "claude", args: ["--resume", sessionId] }
+    case "codex":
+      return { command: "codex", args: ["resume", "--cd", workspace, sessionId] }
+    case "opencode":
+      return { command: "opencode", args: [workspace, "--session", sessionId] }
+    case "hermes":
+      return { command: "hermes", args: ["--resume", sessionId] }
+  }
 }
 
 export function spawnLocalAgent(params: {
@@ -61,7 +127,33 @@ export function spawnLocalAgent(params: {
   workspace: string
 }): LocalAgentRecord {
   const spec = localAgentCommand(params.agent, params.task, params.workspace)
-  return spawnLocalAgentCommand({ ...params, command: spec.command, args: spec.args })
+  return spawnLocalAgentCommand({
+    ...params,
+    command: spec.command,
+    args: spec.args,
+    sessionId: spec.sessionId,
+    sessionMarker: spec.sessionMarker,
+  })
+}
+
+// Capture the session id the agent prints, while the banner/footer is still
+// in the bounded buffer. codex announces it up front; hermes on exit.
+function captureSessionId(record: LocalAgentRecord): void {
+  if (record.sessionId) return
+  const pattern =
+    record.agent === "codex"
+      ? /^session id:\s*([0-9a-f][0-9a-f-]{7,})/im
+      : record.agent === "hermes"
+        ? /^Session:\s*(\S+)/im
+        : null
+  if (!pattern) return
+  const match = record.stdout.match(pattern) ?? record.stderr.match(pattern)
+  if (match) record.sessionId = match[1]
+}
+
+function allocHandle(agent: LocalAgentKind): string {
+  counts[agent] += 1
+  return `${agent}#${counts[agent]}`
 }
 
 export function spawnLocalAgentCommand(params: {
@@ -71,9 +163,10 @@ export function spawnLocalAgentCommand(params: {
   command: string
   args: string[]
   keepStdinOpen?: boolean
+  sessionId?: string
+  sessionMarker?: string
 }): LocalAgentRecord {
-  counts[params.agent] += 1
-  const handle = `${params.agent}#${counts[params.agent]}`
+  const handle = allocHandle(params.agent)
   const child = spawn(params.command, params.args, {
     cwd: params.workspace,
     env: process.env,
@@ -88,6 +181,8 @@ export function spawnLocalAgentCommand(params: {
     command: params.command,
     args: params.args,
     startedAt: new Date().toISOString(),
+    sessionId: params.sessionId,
+    sessionMarker: params.sessionMarker,
     stdout: "",
     stderr: "",
     stdoutDropped: 0,
@@ -104,9 +199,11 @@ export function spawnLocalAgentCommand(params: {
 
   child.stdout.on("data", (chunk) => {
     appendBounded(record, "stdout", chunk.toString("utf8"))
+    captureSessionId(record)
   })
   child.stderr.on("data", (chunk) => {
     appendBounded(record, "stderr", chunk.toString("utf8"))
+    captureSessionId(record)
   })
   child.on("error", (error) => {
     appendBounded(record, "stderr", `${error.message}\n`)
@@ -160,6 +257,67 @@ export function stopLocalAgent(handle: string): boolean {
   const record = agents.get(handle)
   if (!record?.process) return false
   return record.process.kill("SIGTERM")
+}
+
+// Track an agent that runs interactively in its own terminal window. The
+// terminal emulator owns the process, so there is no output capture and no
+// stdin; the record exists so agent_list shows it and agent_takeover can
+// resume the session later (when its id is known).
+export function registerVisibleAgent(params: {
+  agent: LocalAgentKind
+  task: string
+  workspace: string
+  command: string
+  args: string[]
+  pid?: number
+  sessionId?: string
+}): LocalAgentRecord {
+  const record: LocalAgentRecord = {
+    handle: allocHandle(params.agent),
+    agent: params.agent,
+    task: params.task,
+    workspace: params.workspace,
+    pid: params.pid,
+    command: params.command,
+    args: params.args,
+    startedAt: new Date().toISOString(),
+    sessionId: params.sessionId,
+    visible: true,
+    stdout: "",
+    stderr: "",
+    stdoutDropped: 0,
+    stderrDropped: 0,
+  }
+  agents.set(record.handle, record)
+  return record
+}
+
+// Resolve the spawned agent's session id, looking opencode runs up by their
+// unique --title marker in opencode.db (read-only; same source the session
+// scanner in ../memory/agentscan.ts reads).
+export async function resolveLocalAgentSessionId(record: LocalAgentRecord): Promise<string | undefined> {
+  captureSessionId(record)
+  if (record.sessionId) return record.sessionId
+  if (record.agent !== "opencode" || !record.sessionMarker) return undefined
+  const xdgData = process.env.XDG_DATA_HOME || join(homedir(), ".local", "share")
+  const dbPath = process.env.ATHENA_SCAN_OPENCODE_DB || join(xdgData, "opencode", "opencode.db")
+  if (!existsSync(dbPath)) return undefined
+  try {
+    const { Database } = await import("bun:sqlite")
+    const db = new Database(dbPath, { readonly: true })
+    try {
+      db.run("PRAGMA busy_timeout = 2000")
+      const row = db
+        .query("SELECT id FROM session WHERE title = ? ORDER BY time_updated DESC LIMIT 1")
+        .get(record.sessionMarker) as { id: string } | null
+      if (row?.id) record.sessionId = row.id
+      return record.sessionId
+    } finally {
+      db.close()
+    }
+  } catch {
+    return undefined
+  }
 }
 
 export async function waitLocalAgent(handle: string, timeoutMs: number): Promise<LocalAgentRecord | undefined> {
