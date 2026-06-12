@@ -7,6 +7,7 @@ import { join } from "node:path"
 import {
   defaultScanRoots,
   scanAgentSessions,
+  scheduleAgentScan,
   type ScanRoots,
 } from "../overlay/packages/opencode/src/session/memory/agentscan"
 import {
@@ -188,6 +189,40 @@ test("scan indexes all four agents and search attributes hits to them", async ()
   const claudeHits = searchSessions(ws, "quasar tenant")
   expect(claudeHits.some((hit) => hit.text.includes("sharding by tenant"))).toBe(true)
   expect(claudeHits.every((hit) => !hit.text.includes("tool_use"))).toBe(true)
+})
+
+// Point the scanner's default roots at empty/missing locations so
+// scheduleAgentScan tests stay hermetic and instant.
+function withEmptyScanRoots<T>(body: () => Promise<T>): Promise<T> {
+  const base = tmp("athscan-sched-")
+  process.env.ATHENA_SCAN_CLAUDE_DIR = join(base, "claude")
+  process.env.ATHENA_SCAN_CODEX_DIR = join(base, "codex")
+  process.env.ATHENA_SCAN_HERMES_DIR = join(base, "hermes")
+  process.env.ATHENA_SCAN_OPENCODE_DB = join(base, "opencode.db")
+  return body().finally(() => {
+    delete process.env.ATHENA_SCAN_CLAUDE_DIR
+    delete process.env.ATHENA_SCAN_CODEX_DIR
+    delete process.env.ATHENA_SCAN_HERMES_DIR
+    delete process.env.ATHENA_SCAN_OPENCODE_DB
+  })
+}
+
+test("scheduleAgentScan is awaitable, coalesces concurrent calls, and throttles", async () => {
+  await withEmptyScanRoots(async () => {
+    // Two synchronous calls share one in-flight scan.
+    const first = scheduleAgentScan({ minIntervalMs: 0 })
+    const coalesced = scheduleAgentScan({ minIntervalMs: 0 })
+    expect(coalesced).toBe(first)
+
+    const stats = await first
+    expect(stats).not.toBeNull()
+    expect(stats!.map((s) => s.agent).sort()).toEqual(["claude", "codex", "hermes", "opencode"])
+
+    // Within the throttle window a refresh resolves to null without scanning,
+    // but an explicit zero interval (e.g. tests, forced refresh) runs again.
+    expect(await scheduleAgentScan()).toBeNull()
+    expect(await scheduleAgentScan({ minIntervalMs: 0 })).not.toBeNull()
+  })
 })
 
 test("missing roots are guarded: nothing indexed, nothing thrown", async () => {

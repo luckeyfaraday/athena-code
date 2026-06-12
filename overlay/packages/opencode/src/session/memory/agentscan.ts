@@ -514,6 +514,8 @@ export function scheduleAgentScan(options: ScheduleAgentScanOptions = {}): Promi
   if (scanRunning) return scanRunning
   if (now - lastScanStarted < (options.minIntervalMs ?? SCAN_INTERVAL_MS)) return Promise.resolve(null)
   lastScanStarted = now
+  // Clear scanRunning before resolving so awaiters that immediately call
+  // again observe the throttle, not the already-settled in-flight promise.
   scanRunning = new Promise<ScanStats[]>((resolve) => {
     setTimeout(() => {
       scanAgentSessions()
@@ -521,14 +523,13 @@ export function scheduleAgentScan(options: ScheduleAgentScanOptions = {}): Promi
           for (const stats of results) {
             if (stats.error) console.error(`athena-code agent scan (${stats.agent}) failed: ${stats.error}`)
           }
+          scanRunning = null
           resolve(results)
         })
         .catch((error) => {
           console.error("athena-code agent scan failed:", error)
-          resolve([])
-        })
-        .finally(() => {
           scanRunning = null
+          resolve([])
         })
     }, 0)
   })
