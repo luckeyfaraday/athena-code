@@ -40,6 +40,30 @@ index 67a64d58c..d94709c92 100644
    .fail((msg, err) => {
      if (
        msg?.startsWith("Unknown argument") ||
+diff --git a/packages/opencode/src/installation/index.ts b/packages/opencode/src/installation/index.ts
+index d2a2ffbe9..fbbf79e7e 100644
+--- a/packages/opencode/src/installation/index.ts
++++ b/packages/opencode/src/installation/index.ts
+@@ -12,6 +12,7 @@ import { makeRuntime } from "@opencode-ai/core/effect/runtime"
+ import semver from "semver"
+ import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
+ import { NpmConfig } from "@opencode-ai/core/npm-config"
++import { makeAthenaInstallationLayer } from "./athena"
+ 
+ const log = Log.create({ service: "installation" })
+ 
+@@ -338,7 +339,10 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProce
+   }),
+ )
+ 
+-export const defaultLayer = layer.pipe(Layer.provide(FetchHttpClient.layer), Layer.provide(AppProcess.defaultLayer))
++// Athena Code publishes its own releases; the upstream layer above tracks
++// OpenCode releases and package managers and would replace this build with
++// stock OpenCode, so every consumer gets the Athena release updater instead.
++export const defaultLayer = makeAthenaInstallationLayer({ Service, UpgradeFailedError })
+ 
+ const { runPromise } = makeRuntime(Service, defaultLayer)
+ 
 diff --git a/packages/opencode/src/plugin/index.ts b/packages/opencode/src/plugin/index.ts
 index 478114209..0b27a34d5 100644
 --- a/packages/opencode/src/plugin/index.ts
@@ -78,7 +102,7 @@ index e7abd0dc9..481436b7f 100644
 +  .command(MemoryCommand)
    .parse()
 diff --git a/packages/tui/src/app.tsx b/packages/tui/src/app.tsx
-index ec1fe4d7d..078efed48 100644
+index ec1fe4d7d..c7eb7273e 100644
 --- a/packages/tui/src/app.tsx
 +++ b/packages/tui/src/app.tsx
 @@ -4,6 +4,7 @@ import { Deferred, Effect } from "effect"
@@ -118,6 +142,15 @@ index ec1fe4d7d..078efed48 100644
      }
    })
  
+@@ -1017,7 +1018,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
+     await DialogAlert.show(
+       dialog,
+       "Update Complete",
+-      `Successfully updated to OpenCode v${result.data.version}. Please restart the application.`,
++      `Successfully updated to Athena Code v${result.data.version}. Please restart the application.`,
+     )
+ 
+     destroyRenderer(renderer)
 diff --git a/packages/tui/src/attention.ts b/packages/tui/src/attention.ts
 index b309edcd9..4751cae9c 100644
 --- a/packages/tui/src/attention.ts
