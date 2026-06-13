@@ -31,7 +31,6 @@ export function AthenaHomeHero() {
       <box paddingTop={1}>
         <text wrapMode="none" selectable={false}>
           <span style={{ fg: theme.primary, attributes: TextAttributes.BOLD }}>A T H E N A</span>
-          <span style={{ fg: theme.textMuted }}>{"   ·   c o m m a n d   r o o m"}</span>
         </text>
       </box>
     </box>
