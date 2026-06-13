@@ -273,17 +273,19 @@ export function respawnLocalAgent(
 }
 
 export type ContinueResult =
-  | { status: "missing" | "running" | "no-session" }
+  | { status: "missing" | "running" | "terminal" | "no-session" }
   | { status: "stdin" | "resumed"; record: LocalAgentRecord }
 
 // Deliver a follow-up message to a spawned agent. Live agents with open stdin
-// get it written directly; exited (or visible-terminal) agents get their
-// session resumed headless with the message as the next prompt, under the
-// same handle. A headless agent that is still mid-run can't take either path.
+// get it written directly; exited headless agents get their session resumed
+// with the message as the next prompt, under the same handle. Agents owned by
+// a visible terminal are blocked because Athena can't observe when the user is
+// done with that terminal, and two writers corrupt one session.
 export async function continueLocalAgent(handle: string, text: string): Promise<ContinueResult> {
   const record = agents.get(handle)
   if (!record) return { status: "missing" }
   if (messageLocalAgent(handle, text)) return { status: "stdin", record }
+  if (record.visible) return { status: "terminal" }
   if (record.process) return { status: "running" }
   const sessionId = await resolveLocalAgentSessionId(record)
   if (!sessionId) return { status: "no-session" }

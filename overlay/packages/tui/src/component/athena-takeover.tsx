@@ -7,7 +7,7 @@
 import { useRenderer } from "@opentui/solid"
 import { onCleanup, onMount } from "solid-js"
 import { useEvent } from "../context/event"
-import { useSync } from "../context/sync"
+import { useRoute } from "../context/route"
 import { useToast } from "../ui/toast"
 import { execResume } from "../util/athena-sessions"
 
@@ -23,7 +23,7 @@ type TakeoverProperties = {
 
 export function AthenaAgentTakeover() {
   const event = useEvent()
-  const sync = useSync()
+  const route = useRoute()
   const renderer = useRenderer()
   const toast = useToast()
 
@@ -33,10 +33,8 @@ export function AthenaAgentTakeover() {
       if (raw.type !== TAKEOVER_EVENT) return
       const props = raw.properties
       if (!props?.agent || !props.sessionId) return
-      // Only the TUI whose server owns the requesting session takes over;
-      // TUIs attached to other servers see the same global stream shape but
-      // won't know this session.
-      if (!sync.data.session.some((session) => session.id === props.requestSessionID)) return
+      // Only the TUI currently showing the requesting session takes over.
+      if (route.data.type !== "session" || route.data.sessionID !== props.requestSessionID) return
       execResume({ agent: props.agent, sessionId: props.sessionId, workspace: props.workspace ?? "" }, renderer, toast)
     })
     onCleanup(unsubscribe)

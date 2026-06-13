@@ -217,7 +217,7 @@ test("continueLocalAgent writes to stdin when the agent keeps it open", async ()
   expect(done?.stdout).toBe("got:hi\n")
 })
 
-test("visible agents are listed but not messageable", () => {
+test("visible agents are listed but not resumed headless", async () => {
   const record = registerVisibleAgent({
     agent: "claude",
     task: "visible run",
@@ -228,6 +228,7 @@ test("visible agents are listed but not messageable", () => {
   })
   expect(record.visible).toBe(true)
   expect(messageLocalAgent(record.handle, "hello")).toBe(false)
+  expect((await continueLocalAgent(record.handle, "hello")).status).toBe("terminal")
 })
 
 test("one-shot agents get stdin closed so stdin-draining CLIs exit", async () => {

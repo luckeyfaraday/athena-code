@@ -115,11 +115,25 @@ export const AgentTakeoverTool = tool({
     if (!record) {
       return { title: "Agent not found", metadata: { error: true, handle: args.handle }, output: `${args.handle} does not exist.` }
     }
+    if (record.visible) {
+      return {
+        title: "Agent owned by terminal",
+        metadata: { error: true, handle: args.handle },
+        output: `${args.handle} is already open in a visible terminal. Athena cannot tell when the user exits that terminal, so it will not resume the same session elsewhere and risk a second writer.`,
+      }
+    }
     // Two writers on one session conflict, so stop a still-running headless
     // agent and give it a moment to flush its session file before resuming.
-    if (!record.visible && record.process) {
+    if (record.process) {
       stopLocalAgent(args.handle)
       await waitLocalAgent(args.handle, 8000)
+      if (record.process) {
+        return {
+          title: "Agent still running",
+          metadata: { error: true, handle: args.handle },
+          output: `${args.handle} did not exit after SIGTERM, so Athena will not resume the same session with a second writer. Stop it first, then retry takeover.`,
+        }
+      }
     }
     const sessionId = await resolveLocalAgentSessionId(record)
     if (!sessionId) {
@@ -135,6 +149,7 @@ export const AgentTakeoverTool = tool({
       if (!launch.ok) {
         return { title: "Terminal launch failed", metadata: { error: true }, output: launch.error ?? "Could not open a terminal window." }
       }
+      record.visible = true
       return {
         title: "Session opened in terminal",
         metadata: { handle: record.handle, sessionId, terminal: launch.terminal },
@@ -187,6 +202,12 @@ export const AgentMessageTool = tool({
           title: "Agent still running",
           metadata: { error: true, handle: args.handle },
           output: `${args.handle} is a one-shot agent that is still mid-run; its stdin is closed and its session cannot be resumed until it finishes. Use agent_wait first, then send the follow-up.`,
+        }
+      case "terminal":
+        return {
+          title: "Agent owned by terminal",
+          metadata: { error: true, handle: args.handle },
+          output: `${args.handle} is open in a visible terminal. Athena cannot tell when the user exits that terminal, so it will not resume the same session headless and risk a second writer.`,
         }
       case "no-session":
         return {
