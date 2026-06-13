@@ -75,6 +75,21 @@ The installer verifies the release checksum, installs
 `athena-code.exe` under `%LOCALAPPDATA%\AthenaCode`, and adds its `bin`
 directory to your user `PATH`.
 
+### Updating
+
+Installed builds update themselves. On startup Athena Code checks the latest
+GitHub release in the background and shows an update prompt inside the app;
+accepting it downloads, verifies, and installs the new version (restart to run
+it). You can also update from the command line at any time:
+
+```bash
+athena-code upgrade            # latest release
+athena-code upgrade v0.2.1     # specific version
+```
+
+Set `"autoupdate": false` in the global config to disable the startup check,
+or `"autoupdate": "notify"` to be notified without ever auto-installing.
+
 ### Build from source
 
 Requirements:

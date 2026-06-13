@@ -29,11 +29,26 @@ New-Item -ItemType Directory -Force -Path $InstallRoot, $BinDir | Out-Null
 $target = Join-Path $InstallRoot "athena-code.exe"
 $command = Join-Path $BinDir "athena-code.exe"
 
+# Windows locks a running executable against overwrite but allows renames, and
+# the in-app updater replaces the binary of the running athena-code process:
+# move the live exe aside before copying. The stale .old file is removed by
+# the next install; removal fails harmlessly while an old process still runs.
+function Set-AthenaExecutable {
+    param([string]$Source, [string]$Destination)
+    $old = "$Destination.old"
+    Remove-Item -LiteralPath $old -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $Destination) {
+        Move-Item -LiteralPath $Destination -Destination $old -Force
+    }
+    Copy-Item -LiteralPath $Source -Destination $Destination -Force
+    Remove-Item -LiteralPath $old -Force -ErrorAction SilentlyContinue
+}
+
 if ($FromFile) {
     if (-not (Test-Path -LiteralPath $FromFile -PathType Leaf)) {
         throw "Binary not found: $FromFile"
     }
-    Copy-Item -LiteralPath $FromFile -Destination $target -Force
+    Set-AthenaExecutable -Source $FromFile -Destination $target
 } else {
     $releasePath = if ($Version -eq "latest") { "latest/download" } else { "download/$Version" }
     $asset = "athena-code-windows-$targetArchitecture.zip"
@@ -55,13 +70,13 @@ if ($FromFile) {
         }
 
         Expand-Archive -LiteralPath $archive -DestinationPath $tempDir -Force
-        Copy-Item -LiteralPath (Join-Path $tempDir "athena-code.exe") -Destination $target -Force
+        Set-AthenaExecutable -Source (Join-Path $tempDir "athena-code.exe") -Destination $target
     } finally {
         Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
-Copy-Item -LiteralPath $target -Destination $command -Force
+Set-AthenaExecutable -Source $target -Destination $command
 
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 $pathEntries = @($userPath -split ";" | Where-Object { $_ })

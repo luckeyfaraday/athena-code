@@ -68,9 +68,16 @@ esac
 mkdir -p "$INSTALL_ROOT/bin" "$BIN_DIR"
 target="$INSTALL_ROOT/bin/athena-code"
 
+# Stage next to the target and rename: the in-app updater replaces the binary
+# of the running athena-code process, and rename never fails with ETXTBSY.
+install_binary() {
+  install -m 0755 "$1" "$target.new"
+  mv -f "$target.new" "$target"
+}
+
 if [[ -n "$SOURCE_FILE" ]]; then
   [[ -f "$SOURCE_FILE" ]] || { echo "error: binary not found: $SOURCE_FILE" >&2; exit 1; }
-  install -m 0755 "$SOURCE_FILE" "$target"
+  install_binary "$SOURCE_FILE"
 else
   command -v curl >/dev/null || { echo "error: curl is required" >&2; exit 1; }
   command -v tar >/dev/null || { echo "error: tar is required" >&2; exit 1; }
@@ -102,7 +109,7 @@ else
     checksum "$asset.sha256"
     tar -xzf "$asset"
   )
-  install -m 0755 "$temp_dir/athena-code" "$target"
+  install_binary "$temp_dir/athena-code"
 fi
 
 ln -sfn "$target" "$BIN_DIR/athena-code"
