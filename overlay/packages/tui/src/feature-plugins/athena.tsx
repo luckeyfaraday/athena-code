@@ -8,6 +8,7 @@ import type { BuiltinTuiPlugin } from "./builtins"
 import { DialogAthenaSessions } from "../component/dialog-athena-sessions"
 import { AthenaHomeHero } from "../component/athena-home-hero"
 import { AthenaDepartureFlight } from "../component/athena-owl"
+import { AthenaAgentTakeover } from "../component/athena-takeover"
 import { AthenaWorkingVerb } from "../component/athena-working-verb"
 import { AthenaCommandRoom } from "./home/athena-command-room"
 import { AthenaHomeFooter } from "./home/athena-status"
@@ -34,7 +35,12 @@ const tui: TuiPlugin = async (api) => {
         return <AthenaWorkingVerb api={api} sessionID={props.session_id} />
       },
       app() {
-        return <AthenaDepartureFlight color={() => api.theme.current.textMuted} />
+        return (
+          <>
+            <AthenaDepartureFlight color={() => api.theme.current.textMuted} />
+            <AthenaAgentTakeover />
+          </>
+        )
       },
     },
   })

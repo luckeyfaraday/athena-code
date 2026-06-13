@@ -1,17 +1,23 @@
 import { statSync } from "node:fs"
 import { tool } from "@opencode-ai/plugin"
+import { GlobalBus } from "../bus/global"
 import { normalizeWorktree } from "../plugin/workspace"
 import {
+  continueLocalAgent,
   getLocalAgent,
   listLocalAgents,
-  messageLocalAgent,
+  localAgentInteractiveCommand,
+  localAgentResumeCommand,
   readLocalAgentOutput,
+  registerVisibleAgent,
+  resolveLocalAgentSessionId,
   spawnLocalAgent,
   stopLocalAgent,
   waitLocalAgent,
   type LocalAgentKind,
   type LocalAgentRecord,
 } from "../session/agent/local"
+import { openVisibleTerminal } from "../session/agent/terminal"
 
 const AGENTS = ["claude", "codex", "opencode", "hermes"] as const
 
@@ -20,6 +26,7 @@ function isAgent(value: string): value is LocalAgentKind {
 }
 
 function status(record: LocalAgentRecord): string {
+  if (record.visible) return `visible terminal · session ${record.sessionId ?? "unknown"}`
   if (record.exitedAt) return `exited pid ${record.pid ?? "?"} exit ${record.exitCode ?? record.signal ?? "?"}`
   return `running pid ${record.pid ?? "?"}`
 }
@@ -38,11 +45,17 @@ function isDirectory(path: string): boolean {
 
 export const AgentSpawnTool = tool({
   description:
-    "Spawn a local coding agent subprocess from the user's prompt. Use when the user asks to spawn, start, delegate to, or hand work to Claude Code, Codex, OpenCode, or Hermes. Captures stdout/stderr for agent_output and agent_wait.",
+    "Spawn a local coding agent subprocess from the user's prompt. Use when the user asks to spawn, start, delegate to, or hand work to Claude Code, Codex, OpenCode, or Hermes. By default runs headless and captures stdout/stderr for agent_output and agent_wait. Pass visible=true when the user wants the agent in its own visible terminal window they can work in directly.",
   args: {
     agent: tool.schema.string().describe('Agent to spawn. Must be one of: "claude", "codex", "opencode", or "hermes".'),
     task: tool.schema.string().describe("Task prompt to pass to the spawned agent."),
     workspace: tool.schema.string().optional().describe("Workspace directory. Omit to use the current Athena Code workspace."),
+    visible: tool.schema
+      .boolean()
+      .optional()
+      .describe(
+        "Open the agent interactively in a new visible terminal window with the task pre-submitted, instead of running it headless. Use when the user wants to see or drive the agent themselves.",
+      ),
   },
   async execute(args, context) {
     const agent = args.agent.trim().toLowerCase()
@@ -53,8 +66,113 @@ export const AgentSpawnTool = tool({
     if (!isDirectory(workspace)) {
       return { title: "Invalid workspace", metadata: { error: true }, output: `Workspace ${JSON.stringify(workspace)} is not a directory.` }
     }
+    if (args.visible) {
+      const spec = localAgentInteractiveCommand(agent, args.task, workspace)
+      const launch = openVisibleTerminal([spec.command, ...spec.args], workspace)
+      if (!launch.ok) {
+        return { title: "Terminal launch failed", metadata: { error: true }, output: launch.error ?? "Could not open a terminal window." }
+      }
+      const record = registerVisibleAgent({
+        agent,
+        task: args.task,
+        workspace,
+        command: spec.command,
+        args: spec.args,
+        sessionId: spec.sessionId,
+      })
+      const note = spec.promptInjected
+        ? `The task prompt was pre-submitted.`
+        : `${agent} cannot pre-fill a prompt; the user must paste the task into the new window.`
+      return {
+        title: "Agent opened in terminal",
+        metadata: { handle: record.handle, terminal: launch.terminal },
+        output: `${render(record)}\nOpened in a new ${launch.terminal} window. ${note} Output is not captured for visible agents.`,
+      }
+    }
     const record = spawnLocalAgent({ agent, task: args.task, workspace })
     return { title: "Agent spawned", metadata: { handle: record.handle, pid: record.pid }, output: render(record) }
+  },
+})
+
+// In-app takeover handshake: the tool can't swap the user's terminal itself,
+// so it publishes this event on the GlobalBus (the same stream that feeds the
+// TUI's SSE event feed); the Athena TUI listener execs the agent's native
+// resume command in place, exactly like picking the session in /find-sessions.
+export const TAKEOVER_EVENT = "athena.agent.takeover"
+
+export const AgentTakeoverTool = tool({
+  description:
+    "Hand a spawned local agent's session over to the user so they can continue the conversation themselves. Use when the user asks to take over, attach to, open, or continue working in a spawned agent's session. where=in_app swaps this terminal into the agent (default); where=terminal opens the resumed agent in a new visible terminal window.",
+  args: {
+    handle: tool.schema.string().describe('Agent handle from agent_spawn, for example "claude#1" or "codex#1".'),
+    where: tool.schema
+      .enum(["in_app", "terminal"])
+      .optional()
+      .describe('Where to open the session: "in_app" (default) takes over the current terminal; "terminal" opens a new visible terminal window.'),
+  },
+  async execute(args, context) {
+    const record = getLocalAgent(args.handle)
+    if (!record) {
+      return { title: "Agent not found", metadata: { error: true, handle: args.handle }, output: `${args.handle} does not exist.` }
+    }
+    if (record.visible) {
+      return {
+        title: "Agent owned by terminal",
+        metadata: { error: true, handle: args.handle },
+        output: `${args.handle} is already open in a visible terminal. Athena cannot tell when the user exits that terminal, so it will not resume the same session elsewhere and risk a second writer.`,
+      }
+    }
+    // Two writers on one session conflict, so stop a still-running headless
+    // agent and give it a moment to flush its session file before resuming.
+    if (record.process) {
+      stopLocalAgent(args.handle)
+      await waitLocalAgent(args.handle, 8000)
+      if (record.process) {
+        return {
+          title: "Agent still running",
+          metadata: { error: true, handle: args.handle },
+          output: `${args.handle} did not exit after SIGTERM, so Athena will not resume the same session with a second writer. Stop it first, then retry takeover.`,
+        }
+      }
+    }
+    const sessionId = await resolveLocalAgentSessionId(record)
+    if (!sessionId) {
+      return {
+        title: "Session id unknown",
+        metadata: { error: true, handle: args.handle },
+        output: `Could not determine the session id for ${args.handle}. Suggest the user run /find-sessions to locate and resume it manually.`,
+      }
+    }
+    const resume = localAgentResumeCommand(record.agent, sessionId, record.workspace)
+    if (args.where === "terminal") {
+      const launch = openVisibleTerminal([resume.command, ...resume.args], record.workspace)
+      if (!launch.ok) {
+        return { title: "Terminal launch failed", metadata: { error: true }, output: launch.error ?? "Could not open a terminal window." }
+      }
+      record.visible = true
+      return {
+        title: "Session opened in terminal",
+        metadata: { handle: record.handle, sessionId, terminal: launch.terminal },
+        output: `Resumed ${record.agent} session ${sessionId} in a new ${launch.terminal} window.`,
+      }
+    }
+    GlobalBus.emit("event", {
+      directory: context.directory,
+      payload: {
+        type: TAKEOVER_EVENT,
+        properties: {
+          agent: record.agent,
+          sessionId,
+          workspace: record.workspace,
+          requestSessionID: context.sessionID,
+        },
+      },
+    })
+    return {
+      title: "Handing over session",
+      metadata: { handle: record.handle, sessionId },
+      output: `Handing this terminal over to ${record.agent} session ${sessionId}. Athena Code returns when the user exits ${record.agent}; after that, agent_message ${record.handle} continues the same session (including the user's interactive turns). If nothing happens (e.g. no TUI attached), the user can run /find-sessions instead.`,
+    }
   },
 })
 
@@ -68,14 +186,44 @@ export const AgentListTool = tool({
 })
 
 export const AgentMessageTool = tool({
-  description: "Send a follow-up instruction over stdin to a running local agent spawned by Athena Code. Note: agents spawned by agent_spawn run one-shot commands with stdin closed and cannot be messaged; this only works for custom-command agents that keep stdin open.",
+  description:
+    "Send a follow-up instruction to a local agent spawned by Athena Code. Running agents that keep stdin open get it directly; exited one-shot agents (including sessions the user worked in after agent_takeover) have their session resumed headless with the message as the next prompt, under the same handle — use agent_output/agent_wait to read the response.",
   args: {
     handle: tool.schema.string().describe('Agent handle, for example "claude#1" or "codex#1".'),
-    text: tool.schema.string().describe("Message to send to the agent over stdin."),
+    text: tool.schema.string().describe("Message or follow-up task to send to the agent."),
   },
   async execute(args) {
-    const ok = messageLocalAgent(args.handle, args.text)
-    return { title: ok ? "Agent messaged" : "Agent not accepting input", metadata: { handle: args.handle, ok }, output: ok ? `Sent message to ${args.handle}.` : `${args.handle} does not exist, has exited, or runs a one-shot command with stdin closed.` }
+    const result = await continueLocalAgent(args.handle, args.text)
+    switch (result.status) {
+      case "missing":
+        return { title: "Agent not found", metadata: { error: true, handle: args.handle }, output: `${args.handle} does not exist.` }
+      case "running":
+        return {
+          title: "Agent still running",
+          metadata: { error: true, handle: args.handle },
+          output: `${args.handle} is a one-shot agent that is still mid-run; its stdin is closed and its session cannot be resumed until it finishes. Use agent_wait first, then send the follow-up.`,
+        }
+      case "terminal":
+        return {
+          title: "Agent owned by terminal",
+          metadata: { error: true, handle: args.handle },
+          output: `${args.handle} is open in a visible terminal. Athena cannot tell when the user exits that terminal, so it will not resume the same session headless and risk a second writer.`,
+        }
+      case "no-session":
+        return {
+          title: "Session id unknown",
+          metadata: { error: true, handle: args.handle },
+          output: `${args.handle} has exited but its session id could not be determined, so the conversation cannot be resumed.`,
+        }
+      case "stdin":
+        return { title: "Agent messaged", metadata: { handle: args.handle, via: "stdin" }, output: `Sent message to ${args.handle} over stdin.` }
+      case "resumed":
+        return {
+          title: "Session resumed with follow-up",
+          metadata: { handle: args.handle, via: "resume", sessionId: result.record.sessionId, pid: result.record.pid },
+          output: `Resumed ${result.record.agent} session ${result.record.sessionId} headless with the follow-up prompt (same handle ${args.handle}; it picks up everything in the session, including turns the user added after a takeover). Use agent_output or agent_wait to read the response. If the user is still working in that session interactively, warn them before sending more.`,
+        }
+    }
   },
 })
 

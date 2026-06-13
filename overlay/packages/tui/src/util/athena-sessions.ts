@@ -7,6 +7,7 @@
 // scanner refresh.
 
 import { Database } from "bun:sqlite"
+import { spawn } from "node:child_process"
 import { existsSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
@@ -203,11 +204,15 @@ export async function refreshSessionIndex(minIntervalMs = FIND_SESSIONS_REFRESH_
   }
 }
 
+// The fields resume needs; satisfied by AthenaSessionEntry and by the
+// athena.agent.takeover event payload.
+export type ResumableSession = Pick<AthenaSessionEntry, "agent" | "sessionId" | "workspace">
+
 // The native resume invocation per agent, run from the session's workspace
 // when it still exists (mirrors the legacy Athena TUI's resume commands).
 // Athena's own sessions resume through this very binary; sessions still known
 // to the running server are instead navigated to in-app by the dialog.
-export function resumeCommand(entry: AthenaSessionEntry): { argv: string[]; cwd: string } | null {
+export function resumeCommand(entry: ResumableSession): { argv: string[]; cwd: string } | null {
   const workspace = entry.workspace && isDirectory(entry.workspace) ? entry.workspace : process.cwd()
   switch (entry.agent) {
     case "athena":
@@ -231,4 +236,50 @@ function isDirectory(path: string): boolean {
   } catch {
     return false
   }
+}
+
+// Minimal surfaces of @opentui's renderer and the TUI toast, so this util
+// stays free of component imports.
+export type ResumeRenderer = {
+  suspend(): void
+  resume(): void
+  requestRender(): void
+  currentRenderBuffer: { clear(): void }
+}
+
+export type ResumeToast = {
+  show(toast: { variant: "error"; title?: string; message: string }): void
+}
+
+// Suspend the TUI and exec the agent's native resume command in this
+// terminal; the TUI repaints when the agent exits. Shared by the
+// /find-sessions dialog and the agent_takeover event listener.
+export function execResume(entry: ResumableSession, renderer: ResumeRenderer, toast: ResumeToast): boolean {
+  const command = resumeCommand(entry)
+  if (!command) {
+    toast.show({ variant: "error", message: `No resume command known for ${entry.agent} sessions` })
+    return false
+  }
+  renderer.suspend()
+  renderer.currentRenderBuffer.clear()
+  const restore = () => {
+    renderer.currentRenderBuffer.clear()
+    renderer.resume()
+    renderer.requestRender()
+  }
+  const child = spawn(command.argv[0]!, command.argv.slice(1), {
+    cwd: command.cwd,
+    stdio: ["inherit", "inherit", "inherit"],
+    shell: process.platform === "win32",
+  })
+  child.on("error", (error) => {
+    restore()
+    toast.show({
+      variant: "error",
+      title: `Failed to launch ${entry.agent}`,
+      message: error instanceof Error ? error.message : String(error),
+    })
+  })
+  child.on("exit", restore)
+  return true
 }

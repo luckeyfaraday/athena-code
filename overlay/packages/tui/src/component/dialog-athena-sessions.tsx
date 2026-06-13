@@ -5,7 +5,6 @@
 // running server open in-app; everything else suspends the renderer and execs
 // the owning agent's native resume command in the session's workspace.
 
-import { spawn } from "node:child_process"
 import { useRenderer } from "@opentui/solid"
 import { createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { useRoute } from "../context/route"
@@ -14,9 +13,9 @@ import { useDialog } from "../ui/dialog"
 import { DialogSelect, type DialogSelectOption } from "../ui/dialog-select"
 import { useToast } from "../ui/toast"
 import {
+  execResume,
   listRecentSessions,
   refreshSessionIndex,
-  resumeCommand,
   searchSessions,
   type AthenaSessionEntry,
 } from "../util/athena-sessions"
@@ -69,33 +68,8 @@ export function DialogAthenaSessions() {
       dialog.clear()
       return
     }
-    const command = resumeCommand(entry)
-    if (!command) {
-      toast.show({ variant: "error", message: `No resume command known for ${entry.agent} sessions` })
-      return
-    }
     dialog.clear()
-    renderer.suspend()
-    renderer.currentRenderBuffer.clear()
-    const restore = () => {
-      renderer.currentRenderBuffer.clear()
-      renderer.resume()
-      renderer.requestRender()
-    }
-    const child = spawn(command.argv[0]!, command.argv.slice(1), {
-      cwd: command.cwd,
-      stdio: ["inherit", "inherit", "inherit"],
-      shell: process.platform === "win32",
-    })
-    child.on("error", (error) => {
-      restore()
-      toast.show({
-        variant: "error",
-        title: `Failed to launch ${entry.agent}`,
-        message: error instanceof Error ? error.message : String(error),
-      })
-    })
-    child.on("exit", restore)
+    execResume(entry, renderer, toast)
   }
 
   const options = createMemo((): DialogSelectOption<AthenaSessionEntry>[] => {
