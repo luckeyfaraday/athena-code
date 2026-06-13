@@ -7,33 +7,31 @@ function lastRuleAction(permission: Record<string, unknown>, name: string): unkn
     .at(-1)?.[1]
 }
 
-test("permissionless defaults allow built-in prompts when user has no rules", () => {
+test("permissionless defaults allow every tool prompt when user has no rules", () => {
   expect(permissionlessDefaults(undefined)).toEqual({
-    doom_loop: "allow",
-    external_directory: "allow",
-    read: "allow",
+    "*": "allow",
   })
 })
 
 test("permissionless defaults keep user rules after Athena defaults", () => {
-  const permission = permissionlessDefaults({ "*": "deny" })
+  const permission = permissionlessDefaults({ bash: "ask" })
 
-  expect(Object.keys(permission)).toEqual(["doom_loop", "external_directory", "read", "*"])
-  expect(lastRuleAction(permission, "read")).toBe("deny")
-  expect(lastRuleAction(permission, "external_directory")).toBe("deny")
-  expect(lastRuleAction(permission, "doom_loop")).toBe("deny")
+  expect(Object.keys(permission)).toEqual(["*", "bash"])
+  expect(lastRuleAction(permission, "bash")).toBe("ask")
+  expect(lastRuleAction(permission, "read")).toBe("allow")
 })
 
 test("permissionless defaults preserve user wildcard and specific ordering", () => {
   const specificAfterWildcard = permissionlessDefaults({ "*": "deny", read: "allow" })
-  expect(Object.keys(specificAfterWildcard)).toEqual(["doom_loop", "external_directory", "*", "read"])
+  expect(Object.keys(specificAfterWildcard)).toEqual(["*", "read"])
   expect(lastRuleAction(specificAfterWildcard, "read")).toBe("allow")
+  expect(lastRuleAction(specificAfterWildcard, "bash")).toBe("deny")
 
   const wildcardAfterSpecific = permissionlessDefaults({ external_directory: "ask", "*": "deny" })
-  expect(Object.keys(wildcardAfterSpecific)).toEqual(["doom_loop", "read", "external_directory", "*"])
+  expect(Object.keys(wildcardAfterSpecific)).toEqual(["external_directory", "*"])
   expect(lastRuleAction(wildcardAfterSpecific, "external_directory")).toBe("deny")
 
   const doomLoopOverride = permissionlessDefaults({ "*": "allow", doom_loop: "deny" })
-  expect(Object.keys(doomLoopOverride)).toEqual(["external_directory", "read", "*", "doom_loop"])
+  expect(Object.keys(doomLoopOverride)).toEqual(["*", "doom_loop"])
   expect(lastRuleAction(doomLoopOverride, "doom_loop")).toBe("deny")
 })

@@ -1,7 +1,5 @@
 const ATHENA_PERMISSION_DEFAULTS = [
-  ["doom_loop", "allow"],
-  ["external_directory", "allow"],
-  ["read", "allow"],
+  ["*", "allow"],
 ] as const
 
 export type PermissionConfig = Record<string, unknown> | undefined

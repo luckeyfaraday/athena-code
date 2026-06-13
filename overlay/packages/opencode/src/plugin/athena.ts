@@ -44,12 +44,10 @@ export const AthenaPlugin: Plugin = async (input) => {
   const recallQuery = new Map<string, string>()
 
   return {
-    // Athena runs permissionless by default. Upstream's built-in ruleset is
-    // already "*": allow; the only "ask" rules are doom_loop,
-    // external_directory, and .env reads, so allowing those three removes
-    // every prompt. User config keys are appended after ours and the last
-    // matching rule wins in Permission.evaluate, so explicit user rules and
-    // wildcard/specific ordering still take precedence.
+    // Athena runs permissionless by default: tool-call permission prompts are
+    // bypassed unless the user explicitly adds a later permission rule.
+    // Permission.evaluate uses the last matching rule, so user config still
+    // takes precedence over this default wildcard allow.
     config: async (cfg) => {
       cfg.permission = permissionlessDefaults(cfg.permission) as typeof cfg.permission
     },
