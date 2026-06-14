@@ -173,7 +173,7 @@ index b309edcd9..4751cae9c 100644
    sounds: {
      default: defaultSoundPath,
 diff --git a/packages/tui/src/component/prompt/index.tsx b/packages/tui/src/component/prompt/index.tsx
-index 0a9f103ef..6f7883cb9 100644
+index 0a9f103ef..89f2f9abe 100644
 --- a/packages/tui/src/component/prompt/index.tsx
 +++ b/packages/tui/src/component/prompt/index.tsx
 @@ -15,8 +15,9 @@ import path from "path"
@@ -244,7 +244,18 @@ index 0a9f103ef..6f7883cb9 100644
          >
            <box
              paddingLeft={2}
-@@ -1469,7 +1452,7 @@ export function Prompt(props: PromptProps) {
+@@ -1425,6 +1408,10 @@ export function Prompt(props: PromptProps) {
+             />
+             <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
+               <box flexDirection="row" gap={1}>
++                <Show when={local.agent.current()}>
++                  {/* Athena: persistent gold sigil anchoring the always-on footer line. */}
++                  <text fg={fadeColor(theme.primary, agentMetaAlpha())}>◆</text>
++                </Show>
+                 <Show when={local.agent.current()} fallback={<box height={1} />}>
+                   {(agent) => (
+                     <>
+@@ -1469,7 +1456,7 @@ export function Prompt(props: PromptProps) {
            borderColor={borderHighlight()}
            customBorderChars={{
              ...EmptyBorder,
@@ -253,7 +264,7 @@ index 0a9f103ef..6f7883cb9 100644
            }}
          >
            <box
-@@ -1480,7 +1463,7 @@ export function Prompt(props: PromptProps) {
+@@ -1480,7 +1467,7 @@ export function Prompt(props: PromptProps) {
                theme.backgroundElement.a !== 0
                  ? {
                      ...EmptyBorder,
@@ -262,7 +273,7 @@ index 0a9f103ef..6f7883cb9 100644
                    }
                  : {
                      ...EmptyBorder,
-@@ -1500,8 +1483,8 @@ export function Prompt(props: PromptProps) {
+@@ -1500,8 +1487,8 @@ export function Prompt(props: PromptProps) {
                >
                  <box flexShrink={0} flexDirection="row" gap={1}>
                    <box marginLeft={1}>
@@ -364,7 +375,7 @@ index d4145e2d8..c07f54fa4 100644
  }
  
 diff --git a/packages/tui/src/routes/session/index.tsx b/packages/tui/src/routes/session/index.tsx
-index 7736eb75b..c51aec235 100644
+index 7736eb75b..8a37ced99 100644
 --- a/packages/tui/src/routes/session/index.tsx
 +++ b/packages/tui/src/routes/session/index.tsx
 @@ -1,5 +1,4 @@
@@ -450,6 +461,75 @@ index 7736eb75b..c51aec235 100644
            >
              <text fg={theme.text}>{text()}</text>
              <Show when={files().length}>
+@@ -1551,7 +1533,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
+                       : local.agent.color(props.message.agent),
+                 }}
+               >
+-                ▣{" "}
++                ◆{" "}
+               </span>{" "}
+               <span style={{ fg: theme.text }}>{Locale.titlecase(props.message.mode)}</span>
+               <span style={{ fg: theme.textMuted }}> · {model()}</span>
+@@ -1657,7 +1639,7 @@ function ReasoningHeader(props: {
+       <Match when={true}>
+         <text fg={fg()} wrapMode="none">
+           <Show when={props.toggleable}>
+-            <span>{props.open ? "- " : "+ "}</span>
++            <span>{props.open ? "▾ " : "▸ "}</span>
+           </Show>
+           <span>Thought</span>
+           <Show when={props.title || props.duration}>
+@@ -1680,20 +1662,30 @@ function ReasoningHeader(props: {
+ 
+ function TextPart(props: { last: boolean; part: TextPart; message: AssistantMessage }) {
+   const ctx = use()
++  const local = useLocal()
+   const { theme, syntax } = useTheme()
++  // Athena: the spoken answer carries a hollow-diamond gutter in the agent's
++  // color, pairing with the user turn's solid ◆ so the transcript reads as a
++  // two-voice dialogue rather than upstream's flush blocks.
++  const color = createMemo(() => local.agent.color(props.message.agent))
+   return (
+     <Show when={props.part.text.trim()}>
+-      <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
+-        <markdown
+-          syntaxStyle={syntax()}
+-          streaming={true}
+-          internalBlockMode="top-level"
+-          content={props.part.text.trim()}
+-          tableOptions={{ style: "grid" }}
+-          conceal={ctx.conceal()}
+-          fg={theme.markdownText}
+-          bg={theme.background}
+-        />
++      <box id={"text-" + props.part.id} flexDirection="row" gap={1} paddingLeft={1} marginTop={1} flexShrink={0}>
++        <box flexShrink={0}>
++          <text fg={color()}>◇</text>
++        </box>
++        <box flexGrow={1} flexShrink={1}>
++          <markdown
++            syntaxStyle={syntax()}
++            streaming={true}
++            internalBlockMode="top-level"
++            content={props.part.text.trim()}
++            tableOptions={{ style: "grid" }}
++            conceal={ctx.conceal()}
++            fg={theme.markdownText}
++            bg={theme.background}
++          />
++        </box>
+       </box>
+     </Show>
+   )
+@@ -1955,7 +1947,7 @@ export function InlineToolRow(props: {
+                 fg={props.color}
+                 attributes={props.denied ? TextAttributes.STRIKETHROUGH : undefined}
+               >
+-                ~ {props.pending}
++                ╌ {props.pending}
+               </text>
+             }
+             when={props.complete}
 diff --git a/packages/tui/src/routes/session/permission.tsx b/packages/tui/src/routes/session/permission.tsx
 index c787a84a8..7962e78aa 100644
 --- a/packages/tui/src/routes/session/permission.tsx
