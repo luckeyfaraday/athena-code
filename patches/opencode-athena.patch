@@ -401,7 +401,7 @@ index d4145e2..c07f54f 100644
  }
  
 diff --git a/packages/tui/src/routes/session/index.tsx b/packages/tui/src/routes/session/index.tsx
-index 7736eb7..41f74c0 100644
+index 7736eb7..74b5ce6 100644
 --- a/packages/tui/src/routes/session/index.tsx
 +++ b/packages/tui/src/routes/session/index.tsx
 @@ -1,5 +1,4 @@
@@ -503,7 +503,15 @@ index 7736eb7..41f74c0 100644
              <text fg={theme.text}>{text()}</text>
              <Show when={files().length}>
                <box flexDirection="row" paddingBottom={metadataVisible() ? 1 : 0} paddingTop={1} gap={1} flexWrap="wrap">
-@@ -1541,7 +1518,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
+@@ -1470,7 +1447,6 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
+   const { theme } = useTheme()
+   const sync = useSync()
+   const messages = createMemo(() => sync.data.message[props.message.sessionID] ?? [])
+-  const model = createMemo(() => Model.name(ctx.providers(), props.message.providerID, props.message.modelID))
+ 
+   const final = createMemo(() => {
+     return props.message.finish && !["tool-calls", "unknown"].includes(props.message.finish)
+@@ -1541,7 +1517,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
        </Show>
        <Switch>
          <Match when={props.last || final() || props.message.error?.name === "MessageAbortedError"}>
@@ -512,15 +520,29 @@ index 7736eb7..41f74c0 100644
              <text marginTop={1}>
                <span
                  style={{
-@@ -1551,7 +1528,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
+@@ -1551,15 +1527,16 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                        : local.agent.color(props.message.agent),
                  }}
                >
 -                ▣{" "}
-+                ◆{" "}
-               </span>{" "}
-               <span style={{ fg: theme.text }}>{Locale.titlecase(props.message.mode)}</span>
-               <span style={{ fg: theme.textMuted }}> · {model()}</span>
+-              </span>{" "}
+-              <span style={{ fg: theme.text }}>{Locale.titlecase(props.message.mode)}</span>
+-              <span style={{ fg: theme.textMuted }}> · {model()}</span>
++                ◆
++              </span>
++              {/* Athena terminal-log: the turn header is just the ◆ seal + the
++                  duration. The agent/model lives on the prompt footer — the
++                  prompt carries the identity, the response doesn't repeat it. */}
+               <Show when={duration()}>
+-                <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
++                <span style={{ fg: theme.textMuted }}> {Locale.duration(duration())}</span>
+               </Show>
+               <Show when={props.message.error?.name === "MessageAbortedError"}>
+-                <span style={{ fg: theme.textMuted }}> · interrupted</span>
++                <span style={{ fg: theme.textMuted }}> interrupted</span>
+               </Show>
+             </text>
+           </box>
 @@ -1657,7 +1634,7 @@ function ReasoningHeader(props: {
        <Match when={true}>
          <text fg={fg()} wrapMode="none">
@@ -539,7 +561,7 @@ index 7736eb7..41f74c0 100644
    return (
      <Show when={props.part.text.trim()}>
        <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
-@@ -1955,7 +1934,7 @@ export function InlineToolRow(props: {
+@@ -1955,18 +1934,22 @@ export function InlineToolRow(props: {
                  fg={props.color}
                  attributes={props.denied ? TextAttributes.STRIKETHROUGH : undefined}
                >
@@ -548,6 +570,22 @@ index 7736eb7..41f74c0 100644
                </text>
              }
              when={props.complete}
+           >
+             <box flexDirection="row">
++              {/* Athena terminal-log: every completed tool row opens with the ╌
++                  weave glyph (matching the pending row) instead of a per-tool
++                  icon, so the transcript reads as a column of command lines. The
++                  tool name/args in the body identify the tool. */}
+               <text
+                 width={INLINE_TOOL_ICON_WIDTH}
+                 fg={props.failed ? props.errorColor : (props.iconColor ?? props.color)}
+                 attributes={props.denied ? TextAttributes.STRIKETHROUGH : undefined}
+               >
+-                {props.icon}
++                {"╌"}
+               </text>
+               <text
+                 flexGrow={1}
 diff --git a/packages/tui/src/routes/session/permission.tsx b/packages/tui/src/routes/session/permission.tsx
 index c787a84..7962e78 100644
 --- a/packages/tui/src/routes/session/permission.tsx
