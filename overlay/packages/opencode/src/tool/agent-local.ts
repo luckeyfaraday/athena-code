@@ -8,6 +8,7 @@ import {
   listLocalAgents,
   localAgentInteractiveCommand,
   localAgentResumeCommand,
+  localAgentTakeoverBlockReason,
   readLocalAgentOutput,
   registerVisibleAgent,
   resolveLocalAgentSessionId,
@@ -115,24 +116,19 @@ export const AgentTakeoverTool = tool({
     if (!record) {
       return { title: "Agent not found", metadata: { error: true, handle: args.handle }, output: `${args.handle} does not exist.` }
     }
-    if (record.visible) {
+    const blockReason = localAgentTakeoverBlockReason(record)
+    if (blockReason === "terminal") {
       return {
         title: "Agent owned by terminal",
         metadata: { error: true, handle: args.handle },
         output: `${args.handle} is already open in a visible terminal. Athena cannot tell when the user exits that terminal, so it will not resume the same session elsewhere and risk a second writer.`,
       }
     }
-    // Two writers on one session conflict, so stop a still-running headless
-    // agent and give it a moment to flush its session file before resuming.
-    if (record.process) {
-      stopLocalAgent(args.handle)
-      await waitLocalAgent(args.handle, 8000)
-      if (record.process) {
-        return {
-          title: "Agent still running",
-          metadata: { error: true, handle: args.handle },
-          output: `${args.handle} did not exit after SIGTERM, so Athena will not resume the same session with a second writer. Stop it first, then retry takeover.`,
-        }
+    if (blockReason === "running") {
+      return {
+        title: "Agent still running",
+        metadata: { error: true, handle: args.handle },
+        output: `${args.handle} is still running, so Athena will not take it over or stop it. Use agent_wait first, then retry takeover after it exits.`,
       }
     }
     const sessionId = await resolveLocalAgentSessionId(record)
