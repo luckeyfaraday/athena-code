@@ -6,21 +6,19 @@ export const athenaRuntimeBrand = (process.env.ATHENA_RUNTIME_BRAND?.trim().toUp
 export const athenaTerminalPrefix =
   athenaRuntimeBrand === "ATHENA CODEX" ? "ACX" : athenaRuntimeBrand === "ATHENA CLAUDE" ? "ACL" : "AC"
 
-// The prompt is a frameless band: just the brand's deep-green panel
-// (theme backgroundElement) around the input, with no border drawn around
-// it — neither upstream's thick left bar nor a thin outline. Consumed by
-// the branding patch's hunks in component/prompt/index.tsx; an empty sides
-// array makes opentui draw no border and reserve no rows/columns for one,
-// so the band runs the full width of the prompt area. chars is kept for
-// the patch's customBorderChars prop but is inert with no sides enabled.
+// Terminal-log prompt: no box around the input — just a single horizontal
+// rule above it (top border only) separating the compose field from the
+// transcript, with a flat field below. Consumed by the branding patch's hunks
+// in component/prompt/index.tsx (border + customBorderChars props); only the
+// horizontal char matters with just the top side enabled.
 export const athenaPromptFrame = {
-  border: [] as ("top" | "left" | "right" | "bottom")[],
+  border: ["top"] as ("top" | "left" | "right" | "bottom")[],
   chars: {
     topLeft: "",
     topRight: "",
     bottomLeft: "",
     bottomRight: "",
-    horizontal: "",
+    horizontal: "─",
     vertical: "",
     bottomT: "",
     topT: "",

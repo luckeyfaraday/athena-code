@@ -7,34 +7,12 @@
 // tui package cannot depend on the opencode package's memory modules).
 
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
-import { existsSync, readFileSync } from "node:fs"
-import { join } from "node:path"
 import { createMemo, createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js"
 import { abbreviateHome } from "../../runtime"
 import { useTuiPaths } from "../../context/runtime"
 import { useHomeSessionDestination } from "../../routes/home/session-destination"
 import { athenaRuntimeBrand } from "../../branding"
-
-type MemoryStatus = {
-  loaded?: number
-  recalled?: number
-  empty_store?: boolean
-}
-
-function readMemoryStatus(directory: string): MemoryStatus | null {
-  const file = join(directory, ".context-workspace", "memory", "status.json")
-  if (!existsSync(file)) return null
-  try {
-    return JSON.parse(readFileSync(file, "utf8")) as MemoryStatus
-  } catch {
-    return null
-  }
-}
-
-function formatMemoryStatus(status: MemoryStatus | null): string {
-  if (!status || status.empty_store) return "memory empty"
-  return `${status.loaded ?? 0} threads held · ${status.recalled ?? 0} recalled`
-}
+import { readMemoryStatus, formatMemoryStatus } from "../../util/athena-memory"
 
 function AthenaMemory(props: { api: TuiPluginApi }) {
   const paths = useTuiPaths()
