@@ -6,12 +6,19 @@
 // status line in the home footer (athena-status.tsx) — neither repeats here.
 
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
+import { useTerminalDimensions } from "@opentui/solid"
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { useTuiPaths } from "../../context/runtime"
 import { archiveStats, type ArchiveStats } from "../../util/athena-sessions"
 import { dailyAphorism } from "../../util/athena-identity"
 
 const STATS_REFRESH_MS = 30_000
+// Padding budget for the centered maxim. Anything that would touch the edge
+// is dropped: the renderer smears overflow into the live characters in narrow
+// terminals (the centered text gets clipped on both sides at once), so the
+// "omit rather than render badly" rule that applies to the data lines below
+// is extended to the maxim.
+const MAXIM_SIDE_PADDING = 4
 
 function formatCount(value: number): string {
   return value.toLocaleString("en-US")
@@ -21,6 +28,7 @@ export function AthenaCommandRoom(props: { api: TuiPluginApi }) {
   const theme = () => props.api.theme.current
   const paths = useTuiPaths()
   const directory = createMemo(() => props.api.state.path.directory || paths.cwd)
+  const dimensions = useTerminalDimensions()
 
   const [stats, setStats] = createSignal<ArchiveStats | null>(null)
   onMount(() => {
@@ -53,7 +61,10 @@ export function AthenaCommandRoom(props: { api: TuiPluginApi }) {
     return out
   })
   const labelWidth = createMemo(() => Math.max(...rows().map((row) => row.label.length), 0))
-  const maxim = dailyAphorism()
+  const maxim = createMemo(() => dailyAphorism())
+  // Smart quotes + " — " separator add 5 cells around the text and source.
+  const maximWidth = createMemo(() => maxim().text.length + maxim().source.length + 5)
+  const maximFits = createMemo(() => dimensions().width >= maximWidth() + MAXIM_SIDE_PADDING)
 
   return (
     <box width="100%" alignItems="center" paddingTop={2} flexShrink={1}>
@@ -68,12 +79,14 @@ export function AthenaCommandRoom(props: { api: TuiPluginApi }) {
             )}
           </For>
         </box>
-        <Show when={rows().length > 0}>
-          <text> </text>
+        <Show when={maximFits()}>
+          <Show when={rows().length > 0}>
+            <text> </text>
+          </Show>
+          <text fg={theme().textMuted} wrapMode="none">
+            “{maxim().text}” — {maxim().source}
+          </text>
         </Show>
-        <text fg={theme().textMuted} wrapMode="none">
-          “{maxim.text}” — {maxim.source}
-        </text>
       </box>
     </box>
   )
