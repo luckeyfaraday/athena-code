@@ -1,5 +1,5 @@
 diff --git a/packages/opencode/src/cli/tui/worker.ts b/packages/opencode/src/cli/tui/worker.ts
-index 31ead18cf..79e40655f 100644
+index 31ead18..79e4065 100644
 --- a/packages/opencode/src/cli/tui/worker.ts
 +++ b/packages/opencode/src/cli/tui/worker.ts
 @@ -3,7 +3,7 @@ import { Server } from "@/server/server"
@@ -12,7 +12,7 @@ index 31ead18cf..79e40655f 100644
  import { GlobalBus } from "@/bus/global"
  import { ServerAuth } from "@/server/auth"
 diff --git a/packages/opencode/src/index.ts b/packages/opencode/src/index.ts
-index 67a64d58c..d94709c92 100644
+index 67a64d5..d94709c 100644
 --- a/packages/opencode/src/index.ts
 +++ b/packages/opencode/src/index.ts
 @@ -6,7 +6,7 @@ import * as Log from "@opencode-ai/core/util/log"
@@ -41,7 +41,7 @@ index 67a64d58c..d94709c92 100644
      if (
        msg?.startsWith("Unknown argument") ||
 diff --git a/packages/opencode/src/installation/index.ts b/packages/opencode/src/installation/index.ts
-index d2a2ffbe9..fbbf79e7e 100644
+index d2a2ffb..fbbf79e 100644
 --- a/packages/opencode/src/installation/index.ts
 +++ b/packages/opencode/src/installation/index.ts
 @@ -12,6 +12,7 @@ import { makeRuntime } from "@opencode-ai/core/effect/runtime"
@@ -65,7 +65,7 @@ index d2a2ffbe9..fbbf79e7e 100644
  const { runPromise } = makeRuntime(Service, defaultLayer)
  
 diff --git a/packages/opencode/src/plugin/index.ts b/packages/opencode/src/plugin/index.ts
-index 478114209..0b27a34d5 100644
+index 4781142..0b27a34 100644
 --- a/packages/opencode/src/plugin/index.ts
 +++ b/packages/opencode/src/plugin/index.ts
 @@ -19,6 +19,7 @@ import { CloudflareAIGatewayAuthPlugin, CloudflareWorkersAuthPlugin } from "./cl
@@ -85,7 +85,7 @@ index 478114209..0b27a34d5 100644
  }
  
 diff --git a/packages/opencode/src/temporary.ts b/packages/opencode/src/temporary.ts
-index e7abd0dc9..481436b7f 100644
+index e7abd0d..481436b 100644
 --- a/packages/opencode/src/temporary.ts
 +++ b/packages/opencode/src/temporary.ts
 @@ -1,5 +1,6 @@
@@ -102,7 +102,7 @@ index e7abd0dc9..481436b7f 100644
 +  .command(MemoryCommand)
    .parse()
 diff --git a/packages/tui/src/app.tsx b/packages/tui/src/app.tsx
-index ec1fe4d7d..c7eb7273e 100644
+index ec1fe4d..c7eb727 100644
 --- a/packages/tui/src/app.tsx
 +++ b/packages/tui/src/app.tsx
 @@ -4,6 +4,7 @@ import { Deferred, Effect } from "effect"
@@ -152,7 +152,7 @@ index ec1fe4d7d..c7eb7273e 100644
  
      destroyRenderer(renderer)
 diff --git a/packages/tui/src/attention.ts b/packages/tui/src/attention.ts
-index b309edcd9..4751cae9c 100644
+index b309edc..4751cae 100644
 --- a/packages/tui/src/attention.ts
 +++ b/packages/tui/src/attention.ts
 @@ -38,14 +38,14 @@ type TuiAttentionHost = TuiAttention & {
@@ -173,7 +173,7 @@ index b309edcd9..4751cae9c 100644
    sounds: {
      default: defaultSoundPath,
 diff --git a/packages/tui/src/component/prompt/index.tsx b/packages/tui/src/component/prompt/index.tsx
-index 0a9f103ef..6f7883cb9 100644
+index 0a9f103..2d93003 100644
 --- a/packages/tui/src/component/prompt/index.tsx
 +++ b/packages/tui/src/component/prompt/index.tsx
 @@ -15,8 +15,9 @@ import path from "path"
@@ -229,7 +229,7 @@ index 0a9f103ef..6f7883cb9 100644
    })
    const maxHeight = createMemo(() => tuiConfig.prompt?.max_height ?? Math.max(6, Math.floor(dimensions().height / 3)))
    const moveLabelWidth = createMemo(() => Math.max(12, Math.min(44, dimensions().width - 48)))
-@@ -1334,12 +1320,9 @@ export function Prompt(props: PromptProps) {
+@@ -1334,22 +1320,25 @@ export function Prompt(props: PromptProps) {
        <box ref={(r: BoxRenderable) => (anchor = r)} visible={props.visible !== false} width="100%">
          <box
            width="100%"
@@ -244,7 +244,44 @@ index 0a9f103ef..6f7883cb9 100644
          >
            <box
              paddingLeft={2}
-@@ -1469,7 +1452,7 @@ export function Prompt(props: PromptProps) {
+             paddingRight={2}
+             paddingTop={1}
+             flexShrink={0}
+-            backgroundColor={theme.backgroundElement}
++            backgroundColor={theme.background}
+             flexGrow={1}
+             width="100%"
+           >
++            <box flexDirection="row" gap={1} width="100%">
++              {/* Athena terminal-log: a gold ◆ › command sigil anchors the input field. */}
++              <box flexShrink={0}>
++                <text fg={theme.primary}>◆ ›</text>
++              </box>
++              <box flexGrow={1}>
+             <textarea
+               width="100%"
+               placeholder={placeholderText()}
+@@ -1419,12 +1408,18 @@ export function Prompt(props: PromptProps) {
+                 }, 0)
+               }}
+               onMouseDown={(r: MouseEvent) => r.target?.focus()}
+-              focusedBackgroundColor={theme.backgroundElement}
++              focusedBackgroundColor={theme.background}
+               cursorColor={props.disabled ? theme.backgroundElement : theme.text}
+               syntaxStyle={syntax()}
+             />
++              </box>
++            </box>
+             <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
+               <box flexDirection="row" gap={1}>
++                <Show when={local.agent.current()}>
++                  {/* Athena: persistent gold sigil anchoring the always-on footer line. */}
++                  <text fg={fadeColor(theme.primary, agentMetaAlpha())}>◆</text>
++                </Show>
+                 <Show when={local.agent.current()} fallback={<box height={1} />}>
+                   {(agent) => (
+                     <>
+@@ -1469,7 +1464,7 @@ export function Prompt(props: PromptProps) {
            borderColor={borderHighlight()}
            customBorderChars={{
              ...EmptyBorder,
@@ -253,7 +290,7 @@ index 0a9f103ef..6f7883cb9 100644
            }}
          >
            <box
-@@ -1480,7 +1463,7 @@ export function Prompt(props: PromptProps) {
+@@ -1480,7 +1475,7 @@ export function Prompt(props: PromptProps) {
                theme.backgroundElement.a !== 0
                  ? {
                      ...EmptyBorder,
@@ -262,7 +299,7 @@ index 0a9f103ef..6f7883cb9 100644
                    }
                  : {
                      ...EmptyBorder,
-@@ -1500,8 +1483,8 @@ export function Prompt(props: PromptProps) {
+@@ -1500,8 +1495,8 @@ export function Prompt(props: PromptProps) {
                >
                  <box flexShrink={0} flexDirection="row" gap={1}>
                    <box marginLeft={1}>
@@ -274,7 +311,7 @@ index 0a9f103ef..6f7883cb9 100644
                    </box>
                    <box flexDirection="row" gap={1} flexShrink={0}>
 diff --git a/packages/tui/src/context/theme.tsx b/packages/tui/src/context/theme.tsx
-index 909dd69ac..00474c3ad 100644
+index 909dd69..00474c3 100644
 --- a/packages/tui/src/context/theme.tsx
 +++ b/packages/tui/src/context/theme.tsx
 @@ -93,7 +93,7 @@ const [store, setStore] = createStore<State>({
@@ -316,7 +353,7 @@ index 909dd69ac..00474c3ad 100644
  
      createEffect(() => renderer.setBackgroundColor(values().background))
 diff --git a/packages/tui/src/feature-plugins/builtins.ts b/packages/tui/src/feature-plugins/builtins.ts
-index 46e122d71..03f4bdca8 100644
+index 46e122d..03f4bdc 100644
 --- a/packages/tui/src/feature-plugins/builtins.ts
 +++ b/packages/tui/src/feature-plugins/builtins.ts
 @@ -1,4 +1,5 @@
@@ -334,7 +371,7 @@ index 46e122d71..03f4bdca8 100644
      HomeTips,
      SidebarContext,
 diff --git a/packages/tui/src/logo.ts b/packages/tui/src/logo.ts
-index a58a8cf99..6f40d30d0 100644
+index a58a8cf..6f40d30 100644
 --- a/packages/tui/src/logo.ts
 +++ b/packages/tui/src/logo.ts
 @@ -1,6 +1,10 @@
@@ -351,7 +388,7 @@ index a58a8cf99..6f40d30d0 100644
  
  export const go = {
 diff --git a/packages/tui/src/routes/home.tsx b/packages/tui/src/routes/home.tsx
-index d4145e2d8..c07f54fa4 100644
+index d4145e2..c07f54f 100644
 --- a/packages/tui/src/routes/home.tsx
 +++ b/packages/tui/src/routes/home.tsx
 @@ -15,7 +15,7 @@ import { HomeSessionDestinationProvider } from "./home/session-destination"
@@ -364,7 +401,7 @@ index d4145e2d8..c07f54fa4 100644
  }
  
 diff --git a/packages/tui/src/routes/session/index.tsx b/packages/tui/src/routes/session/index.tsx
-index 7736eb75b..c51aec235 100644
+index 7736eb7..74b5ce6 100644
 --- a/packages/tui/src/routes/session/index.tsx
 +++ b/packages/tui/src/routes/session/index.tsx
 @@ -1,5 +1,4 @@
@@ -425,7 +462,7 @@ index 7736eb75b..c51aec235 100644
      {
        title: conceal() ? "Disable code concealment" : "Enable code concealment",
        value: "session.toggle.conceal",
-@@ -1393,11 +1372,13 @@ function UserMessage(props: {
+@@ -1393,25 +1372,23 @@ function UserMessage(props: {
        <Show when={text()}>
          <box
            id={props.message.id}
@@ -435,23 +472,122 @@ index 7736eb75b..c51aec235 100644
 +          flexDirection="row"
 +          gap={1}
            marginTop={props.index === 0 ? 0 : 1}
++          onMouseOver={() => {
++            setHover(true)
++          }}
++          onMouseOut={() => {
++            setHover(false)
++          }}
++          onMouseUp={props.onMouseUp}
          >
-+          <box flexShrink={0} paddingTop={1}>
-+            <text fg={color()}>◆</text>
+-          <box
+-            onMouseOver={() => {
+-              setHover(true)
+-            }}
+-            onMouseOut={() => {
+-              setHover(false)
+-            }}
+-            onMouseUp={props.onMouseUp}
+-            paddingTop={1}
+-            paddingBottom={1}
+-            paddingLeft={2}
+-            backgroundColor={hover() ? theme.backgroundElement : theme.backgroundPanel}
+-            flexShrink={0}
+-          >
++          {/* Athena terminal-log: the user turn is a command line — a gold ❯
++              prompt sigil then the text, no bubble and no panel fill. */}
++          <box flexShrink={0}>
++            <text fg={hover() ? theme.primary : color()}>❯</text>
 +          </box>
-           <box
-             onMouseOver={() => {
-               setHover(true)
-@@ -1411,6 +1392,7 @@ function UserMessage(props: {
-             paddingLeft={2}
-             backgroundColor={hover() ? theme.backgroundElement : theme.backgroundPanel}
-             flexShrink={0}
-+            flexGrow={1}
-           >
++          <box flexShrink={0} flexGrow={1}>
              <text fg={theme.text}>{text()}</text>
              <Show when={files().length}>
+               <box flexDirection="row" paddingBottom={metadataVisible() ? 1 : 0} paddingTop={1} gap={1} flexWrap="wrap">
+@@ -1470,7 +1447,6 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
+   const { theme } = useTheme()
+   const sync = useSync()
+   const messages = createMemo(() => sync.data.message[props.message.sessionID] ?? [])
+-  const model = createMemo(() => Model.name(ctx.providers(), props.message.providerID, props.message.modelID))
+ 
+   const final = createMemo(() => {
+     return props.message.finish && !["tool-calls", "unknown"].includes(props.message.finish)
+@@ -1541,7 +1517,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
+       </Show>
+       <Switch>
+         <Match when={props.last || final() || props.message.error?.name === "MessageAbortedError"}>
+-          <box paddingLeft={3}>
++          <box paddingLeft={1}>
+             <text marginTop={1}>
+               <span
+                 style={{
+@@ -1551,15 +1527,16 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
+                       : local.agent.color(props.message.agent),
+                 }}
+               >
+-                ▣{" "}
+-              </span>{" "}
+-              <span style={{ fg: theme.text }}>{Locale.titlecase(props.message.mode)}</span>
+-              <span style={{ fg: theme.textMuted }}> · {model()}</span>
++                ◆
++              </span>
++              {/* Athena terminal-log: the turn header is just the ◆ seal + the
++                  duration. The agent/model lives on the prompt footer — the
++                  prompt carries the identity, the response doesn't repeat it. */}
+               <Show when={duration()}>
+-                <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
++                <span style={{ fg: theme.textMuted }}> {Locale.duration(duration())}</span>
+               </Show>
+               <Show when={props.message.error?.name === "MessageAbortedError"}>
+-                <span style={{ fg: theme.textMuted }}> · interrupted</span>
++                <span style={{ fg: theme.textMuted }}> interrupted</span>
+               </Show>
+             </text>
+           </box>
+@@ -1657,7 +1634,7 @@ function ReasoningHeader(props: {
+       <Match when={true}>
+         <text fg={fg()} wrapMode="none">
+           <Show when={props.toggleable}>
+-            <span>{props.open ? "- " : "+ "}</span>
++            <span>{props.open ? "▾ " : "▸ "}</span>
+           </Show>
+           <span>Thought</span>
+           <Show when={props.title || props.duration}>
+@@ -1681,6 +1658,8 @@ function ReasoningHeader(props: {
+ function TextPart(props: { last: boolean; part: TextPart; message: AssistantMessage }) {
+   const ctx = use()
+   const { theme, syntax } = useTheme()
++  // Athena terminal-log: the spoken answer is simply indented under the ◆ agent
++  // header — no gutter glyph, no bubble, just the prose as a command-log block.
+   return (
+     <Show when={props.part.text.trim()}>
+       <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
+@@ -1955,18 +1934,22 @@ export function InlineToolRow(props: {
+                 fg={props.color}
+                 attributes={props.denied ? TextAttributes.STRIKETHROUGH : undefined}
+               >
+-                ~ {props.pending}
++                ╌ {props.pending}
+               </text>
+             }
+             when={props.complete}
+           >
+             <box flexDirection="row">
++              {/* Athena terminal-log: every completed tool row opens with the ╌
++                  weave glyph (matching the pending row) instead of a per-tool
++                  icon, so the transcript reads as a column of command lines. The
++                  tool name/args in the body identify the tool. */}
+               <text
+                 width={INLINE_TOOL_ICON_WIDTH}
+                 fg={props.failed ? props.errorColor : (props.iconColor ?? props.color)}
+                 attributes={props.denied ? TextAttributes.STRIKETHROUGH : undefined}
+               >
+-                {props.icon}
++                {"╌"}
+               </text>
+               <text
+                 flexGrow={1}
 diff --git a/packages/tui/src/routes/session/permission.tsx b/packages/tui/src/routes/session/permission.tsx
-index c787a84a8..7962e78aa 100644
+index c787a84..7962e78 100644
 --- a/packages/tui/src/routes/session/permission.tsx
 +++ b/packages/tui/src/routes/session/permission.tsx
 @@ -141,11 +141,11 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
@@ -478,7 +614,7 @@ index c787a84a8..7962e78aa 100644
        </box>
        <box
 diff --git a/packages/tui/src/theme/index.ts b/packages/tui/src/theme/index.ts
-index e8a5f2c5a..eaaa7904e 100644
+index e8a5f2c..eaaa790 100644
 --- a/packages/tui/src/theme/index.ts
 +++ b/packages/tui/src/theme/index.ts
 @@ -1,4 +1,5 @@
@@ -496,7 +632,7 @@ index e8a5f2c5a..eaaa7904e 100644
    ayu,
    catppuccin,
 diff --git a/packages/tui/src/util/presentation.ts b/packages/tui/src/util/presentation.ts
-index cf432bf96..aad5a4fef 100644
+index cf432bf..aad5a4f 100644
 --- a/packages/tui/src/util/presentation.ts
 +++ b/packages/tui/src/util/presentation.ts
 @@ -1,6 +1,7 @@
