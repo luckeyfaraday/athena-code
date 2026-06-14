@@ -276,6 +276,14 @@ export type ContinueResult =
   | { status: "missing" | "running" | "terminal" | "no-session" }
   | { status: "stdin" | "resumed"; record: LocalAgentRecord }
 
+export type TakeoverBlockReason = "running" | "terminal"
+
+export function localAgentTakeoverBlockReason(record: LocalAgentRecord): TakeoverBlockReason | undefined {
+  if (record.visible) return "terminal"
+  if (record.process) return "running"
+  return undefined
+}
+
 // Deliver a follow-up message to a spawned agent. Live agents with open stdin
 // get it written directly; exited headless agents get their session resumed
 // with the message as the next prompt, under the same handle. Agents owned by

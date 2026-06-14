@@ -8,6 +8,7 @@ import {
   localAgentContinueCommand,
   localAgentInteractiveCommand,
   localAgentResumeCommand,
+  localAgentTakeoverBlockReason,
   messageLocalAgent,
   readLocalAgentOutput,
   registerVisibleAgent,
@@ -203,6 +204,24 @@ test("continueLocalAgent reports mid-run one-shots and unknown sessions", async 
   expect((await continueLocalAgent("codex#999", "ghost")).status).toBe("missing")
 })
 
+test("takeover is blocked for running headless agents without killing them", async () => {
+  const running = spawnLocalAgentCommand({
+    agent: "codex",
+    task: "long run",
+    workspace: workspace("athagent-"),
+    command: process.execPath,
+    args: ["-e", "setTimeout(() => {}, 3000)"],
+  })
+
+  expect(localAgentTakeoverBlockReason(running)).toBe("running")
+  expect(running.process).toBeDefined()
+  expect(running.exitedAt).toBeUndefined()
+
+  running.process?.kill("SIGKILL")
+  await waitLocalAgent(running.handle, 5000)
+  expect(localAgentTakeoverBlockReason(running)).toBeUndefined()
+})
+
 test("continueLocalAgent writes to stdin when the agent keeps it open", async () => {
   const record = spawnLocalAgentCommand({
     agent: "claude",
@@ -227,6 +246,7 @@ test("visible agents are listed but not resumed headless", async () => {
     sessionId: "uuid-1",
   })
   expect(record.visible).toBe(true)
+  expect(localAgentTakeoverBlockReason(record)).toBe("terminal")
   expect(messageLocalAgent(record.handle, "hello")).toBe(false)
   expect((await continueLocalAgent(record.handle, "hello")).status).toBe("terminal")
 })
