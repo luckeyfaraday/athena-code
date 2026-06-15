@@ -17,6 +17,12 @@ facts for each turn; and indexes prior conversations for later search.
 > Linux, macOS, and Windows on x64 and ARM64. macOS and Windows binaries are not
 > yet code-signed.
 
+## Demo
+
+A short look at the Athena Code terminal UI:
+
+https://github.com/user-attachments/assets/694b0ed3-a261-49a0-a0e9-1241a2c206fa
+
 ## Why Athena Code?
 
 Most coding agents start each session without durable knowledge of your
