@@ -28,6 +28,11 @@ export type LocalAgentRecord = {
   // True when the agent runs interactively in its own terminal window: no
   // stdout/stderr is captured and stdin cannot be messaged.
   visible?: boolean
+  // PID of the visible terminal emulator (process-group leader on POSIX), set
+  // when the window was launched with a killable handle. Lets stopLocalAgent
+  // close the window. Undefined on macOS/Windows where the window isn't a
+  // process we own.
+  terminalPid?: number
   stdout: string
   stderr: string
   // Characters trimmed from the front of each buffer once it exceeds
@@ -336,9 +341,36 @@ export function readLocalAgentOutput(
   }
 }
 
+// Close a visible terminal window we launched. The emulator was spawned
+// detached (a process-group leader on POSIX), so signalling the negated PID
+// tears down the whole group — the window and the agent CLI running inside it.
+// Falls back to a plain single-PID kill if the group signal is rejected.
+function closeVisibleTerminal(record: LocalAgentRecord): boolean {
+  if (record.terminalPid == null) return false
+  let closed = false
+  try {
+    process.kill(-record.terminalPid, "SIGTERM")
+    closed = true
+  } catch {
+    try {
+      process.kill(record.terminalPid, "SIGTERM")
+      closed = true
+    } catch {
+      closed = false
+    }
+  }
+  if (closed) {
+    record.visible = false
+    record.exitedAt = new Date().toISOString()
+  }
+  return closed
+}
+
 export function stopLocalAgent(handle: string): boolean {
   const record = agents.get(handle)
-  if (!record?.process) return false
+  if (!record) return false
+  if (record.visible) return closeVisibleTerminal(record)
+  if (!record.process) return false
   return record.process.kill("SIGTERM")
 }
 
@@ -366,6 +398,7 @@ export function registerVisibleAgent(params: {
     startedAt: new Date().toISOString(),
     sessionId: params.sessionId,
     visible: true,
+    terminalPid: params.pid,
     stdout: "",
     stderr: "",
     stdoutDropped: 0,

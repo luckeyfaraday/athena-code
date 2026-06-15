@@ -10,6 +10,12 @@ import { existsSync } from "node:fs"
 export type TerminalLaunch = {
   ok: boolean
   terminal?: string
+  // PID of the spawned emulator process. On Linux/BSD it is a process-group
+  // leader (detached spawn calls setsid), so killing -pid closes the window
+  // and the agent inside it. Undefined on platforms where we can't get a
+  // killable handle to the window (macOS Terminal.app via osascript, Windows
+  // `start`), in which case the window can't be closed programmatically yet.
+  pid?: number
   error?: string
 }
 
@@ -80,7 +86,7 @@ function launchDetached(argv: string[], cwd: string): TerminalLaunch {
     })
     child.on("error", () => {})
     child.unref()
-    return { ok: true, terminal: basename(argv[0]!) }
+    return { ok: true, terminal: basename(argv[0]!), pid: child.pid }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
