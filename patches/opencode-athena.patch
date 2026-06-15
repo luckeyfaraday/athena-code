@@ -172,6 +172,38 @@ index b309edc..4751cae 100644
    builtin: true,
    sounds: {
      default: defaultSoundPath,
+diff --git a/packages/tui/src/component/dialog-provider.tsx b/packages/tui/src/component/dialog-provider.tsx
+index 2767508..9aef9c5 100644
+--- a/packages/tui/src/component/dialog-provider.tsx
++++ b/packages/tui/src/component/dialog-provider.tsx
+@@ -294,12 +294,14 @@ function AutoMethod(props: AutoMethodProps) {
+         </text>
+       </box>
+       <box gap={1}>
+-        <Link href={props.authorization.url} fg={theme.primary} />
++        <Link href={props.authorization.url} fg={theme.primary} attributes={TextAttributes.UNDERLINE}>
++          ↗ Open authorization page in browser
++        </Link>
+         <text fg={theme.textMuted}>{props.authorization.instructions}</text>
+       </box>
+       <text fg={theme.textMuted}>Waiting for authorization...</text>
+       <text fg={theme.text}>
+-        c <span style={{ fg: theme.textMuted }}>copy</span>
++        c <span style={{ fg: theme.textMuted }}>copy link</span>
+       </text>
+     </box>
+   )
+@@ -339,7 +341,9 @@ function CodeMethod(props: CodeMethodProps) {
+       description={() => (
+         <box gap={1}>
+           <text fg={theme.textMuted}>{props.authorization.instructions}</text>
+-          <Link href={props.authorization.url} fg={theme.primary} />
++          <Link href={props.authorization.url} fg={theme.primary} attributes={TextAttributes.UNDERLINE}>
++            ↗ Open authorization page in browser
++          </Link>
+           <Show when={error()}>
+             <text fg={theme.error}>Invalid code</text>
+           </Show>
 diff --git a/packages/tui/src/component/prompt/index.tsx b/packages/tui/src/component/prompt/index.tsx
 index 0a9f103..2d93003 100644
 --- a/packages/tui/src/component/prompt/index.tsx
@@ -631,6 +663,36 @@ index e8a5f2c..eaaa790 100644
    aura,
    ayu,
    catppuccin,
+diff --git a/packages/tui/src/ui/link.tsx b/packages/tui/src/ui/link.tsx
+index cfd78bc..7729823 100644
+--- a/packages/tui/src/ui/link.tsx
++++ b/packages/tui/src/ui/link.tsx
+@@ -9,11 +9,17 @@ export interface LinkProps {
+   bg?: RGBA
+   width?: number | "auto" | `${number}%`
+   wrapMode?: "word" | "none"
++  attributes?: number
+ }
+ 
+ /**
+  * Link component that renders clickable hyperlinks.
+  * Clicking anywhere on the link text opens the URL in the default browser.
++ *
++ * Terminals only auto-link URLs that fit on a single physical line, so passing
++ * a long `href` as the display text leaves it word-wrapped and only the first
++ * line clickable. Prefer a short label via `children` (the full `href` still
++ * opens on click) for anything that would wrap.
+  */
+ export function Link(props: LinkProps) {
+   const displayText = props.children ?? props.href
+@@ -24,6 +30,7 @@ export function Link(props: LinkProps) {
+       bg={props.bg}
+       width={props.width}
+       wrapMode={props.wrapMode}
++      attributes={props.attributes}
+       onMouseUp={() => {
+         open(props.href).catch(() => {})
+       }}
 diff --git a/packages/tui/src/util/presentation.ts b/packages/tui/src/util/presentation.ts
 index cf432bf..aad5a4f 100644
 --- a/packages/tui/src/util/presentation.ts
