@@ -755,6 +755,104 @@ index e8a5f2c..d530efd 100644
  }
  
  const pluginThemes: Record<string, ThemeJson> = {}
+diff --git a/packages/tui/src/ui/dialog.tsx b/packages/tui/src/ui/dialog.tsx
+index b6cd705..c5fcddb 100644
+--- a/packages/tui/src/ui/dialog.tsx
++++ b/packages/tui/src/ui/dialog.tsx
+@@ -11,6 +11,12 @@ import { useClipboard } from "../context/clipboard"
+ export function Dialog(
+   props: ParentProps<{
+     size?: "medium" | "large" | "xlarge"
++    // Athena: an anchored dialog drops the centered-modal posture and flushes the
++    // panel to the bottom of the screen (rising from the prompt) with no dimming
++    // scrim — the command console uses this so the menu reads as part of the
++    // terminal command-log rather than a floating opencode modal.
++    anchor?: "center" | "bottom"
++    scrim?: boolean
+     onClose: () => void
+   }>,
+ ) {
+@@ -24,6 +30,8 @@ export function Dialog(
+     if (props.size === "large") return 88
+     return 60
+   }
++  const anchored = () => props.anchor === "bottom"
++  const scrim = () => props.scrim !== false
+ 
+   return (
+     <box
+@@ -40,12 +48,14 @@ export function Dialog(
+       width={dimensions().width}
+       height={dimensions().height}
+       alignItems="center"
++      justifyContent={anchored() ? "flex-end" : "flex-start"}
+       position="absolute"
+       zIndex={3000}
+-      paddingTop={dimensions().height / 4}
++      paddingTop={anchored() ? 0 : dimensions().height / 4}
++      paddingBottom={anchored() ? 1 : 0}
+       left={0}
+       top={0}
+-      backgroundColor={RGBA.fromInts(0, 0, 0, 150)}
++      backgroundColor={scrim() ? RGBA.fromInts(0, 0, 0, 150) : RGBA.fromInts(0, 0, 0, 0)}
+     >
+       <box
+         onMouseUp={(e: { stopPropagation(): void }) => {
+@@ -70,6 +80,8 @@ function init() {
+       onClose?: () => void
+     }[],
+     size: "medium" as "medium" | "large" | "xlarge",
++    anchor: "center" as "center" | "bottom",
++    scrim: true,
+   })
+ 
+   const renderer = useRenderer()
+@@ -140,6 +152,8 @@ function init() {
+       }
+       batch(() => {
+         setStore("size", "medium")
++        setStore("anchor", "center")
++        setStore("scrim", true)
+         setStore("stack", [])
+       })
+       refocus()
+@@ -153,6 +167,8 @@ function init() {
+         if (item.onClose) item.onClose()
+       }
+       setStore("size", "medium")
++      setStore("anchor", "center")
++      setStore("scrim", true)
+       setStore("stack", [
+         {
+           element: input,
+@@ -169,6 +185,18 @@ function init() {
+     setSize(size: "medium" | "large" | "xlarge") {
+       setStore("size", size)
+     },
++    get anchor() {
++      return store.anchor
++    },
++    setAnchor(anchor: "center" | "bottom") {
++      setStore("anchor", anchor)
++    },
++    get scrim() {
++      return store.scrim
++    },
++    setScrim(scrim: boolean) {
++      setStore("scrim", scrim)
++    },
+   }
+ }
+ 
+@@ -210,7 +238,7 @@ export function DialogProvider(props: ParentProps) {
+         onMouseUp={!Flag.OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT ? copySelection : undefined}
+       >
+         <Show when={value.stack.length}>
+-          <Dialog onClose={() => value.clear()} size={value.size}>
++          <Dialog onClose={() => value.clear()} size={value.size} anchor={value.anchor} scrim={value.scrim}>
+             {value.stack.at(-1)!.element}
+           </Dialog>
+         </Show>
 diff --git a/packages/tui/src/ui/link.tsx b/packages/tui/src/ui/link.tsx
 index cfd78bc..7729823 100644
 --- a/packages/tui/src/ui/link.tsx
