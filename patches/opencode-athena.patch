@@ -343,7 +343,7 @@ index 0a9f103..2d93003 100644
                    </box>
                    <box flexDirection="row" gap={1} flexShrink={0}>
 diff --git a/packages/tui/src/context/theme.tsx b/packages/tui/src/context/theme.tsx
-index 909dd69..00474c3 100644
+index 909dd69..a7182ff 100644
 --- a/packages/tui/src/context/theme.tsx
 +++ b/packages/tui/src/context/theme.tsx
 @@ -93,7 +93,7 @@ const [store, setStore] = createStore<State>({
@@ -375,12 +375,30 @@ index 909dd69..00474c3 100644
      }
  
      onMount(() => {
+@@ -159,7 +159,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
+           if (!colors.palette[0]) {
+             if (hasResolvedSystemTheme) return
+             setSystemTheme(undefined)
+-            if (store.active === "system") setStore("active", "opencode")
++            if (store.active === "system") setStore("active", "athena")
+             return
+           }
+           const next = store.lock ?? terminalMode(colors) ?? mode
+@@ -174,7 +174,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
+         .catch(() => {
+           if (hasResolvedSystemTheme) return
+           setSystemTheme(undefined)
+-          if (store.active === "system") setStore("active", "opencode")
++          if (store.active === "system") setStore("active", "athena")
+         })
+     }
+ 
 @@ -263,7 +263,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
          if (theme) return resolveTheme(theme, store.mode)
        }
  
 -      return resolveTheme(store.themes.opencode, store.mode)
-+      return resolveTheme(store.themes.athena ?? store.themes.opencode, store.mode)
++      return resolveTheme(store.themes.athena, store.mode)
      })
  
      createEffect(() => renderer.setBackgroundColor(values().background))
@@ -646,23 +664,97 @@ index c787a84..7962e78 100644
        </box>
        <box
 diff --git a/packages/tui/src/theme/index.ts b/packages/tui/src/theme/index.ts
-index e8a5f2c..eaaa790 100644
+index e8a5f2c..d530efd 100644
 --- a/packages/tui/src/theme/index.ts
 +++ b/packages/tui/src/theme/index.ts
-@@ -1,4 +1,5 @@
+@@ -1,37 +1,9 @@
  import { SyntaxStyle, RGBA, type TerminalColors } from "@opentui/core"
+-import aura from "./assets/aura.json" with { type: "json" }
+-import ayu from "./assets/ayu.json" with { type: "json" }
+-import carbonfox from "./assets/carbonfox.json" with { type: "json" }
+-import catppuccinFrappe from "./assets/catppuccin-frappe.json" with { type: "json" }
+-import catppuccinMacchiato from "./assets/catppuccin-macchiato.json" with { type: "json" }
+-import catppuccin from "./assets/catppuccin.json" with { type: "json" }
+-import cobalt2 from "./assets/cobalt2.json" with { type: "json" }
+-import cursor from "./assets/cursor.json" with { type: "json" }
+-import dracula from "./assets/dracula.json" with { type: "json" }
+-import everforest from "./assets/everforest.json" with { type: "json" }
+-import flexoki from "./assets/flexoki.json" with { type: "json" }
+-import github from "./assets/github.json" with { type: "json" }
+-import gruvbox from "./assets/gruvbox.json" with { type: "json" }
+-import kanagawa from "./assets/kanagawa.json" with { type: "json" }
+-import lucentOrng from "./assets/lucent-orng.json" with { type: "json" }
+-import material from "./assets/material.json" with { type: "json" }
+-import matrix from "./assets/matrix.json" with { type: "json" }
+-import mercury from "./assets/mercury.json" with { type: "json" }
+-import monokai from "./assets/monokai.json" with { type: "json" }
+-import nightowl from "./assets/nightowl.json" with { type: "json" }
+-import nord from "./assets/nord.json" with { type: "json" }
+-import onedark from "./assets/one-dark.json" with { type: "json" }
+-import opencode from "./assets/opencode.json" with { type: "json" }
+-import orng from "./assets/orng.json" with { type: "json" }
+-import osakaJade from "./assets/osaka-jade.json" with { type: "json" }
+-import palenight from "./assets/palenight.json" with { type: "json" }
+-import rosepine from "./assets/rosepine.json" with { type: "json" }
+-import solarized from "./assets/solarized.json" with { type: "json" }
+-import synthwave84 from "./assets/synthwave84.json" with { type: "json" }
+-import tokyonight from "./assets/tokyonight.json" with { type: "json" }
+-import vercel from "./assets/vercel.json" with { type: "json" }
+-import vesper from "./assets/vesper.json" with { type: "json" }
+-import zenburn from "./assets/zenburn.json" with { type: "json" }
 +import athena from "./assets/athena.json" with { type: "json" }
- import aura from "./assets/aura.json" with { type: "json" }
- import ayu from "./assets/ayu.json" with { type: "json" }
- import carbonfox from "./assets/carbonfox.json" with { type: "json" }
-@@ -128,6 +129,7 @@ export type ThemeJson = {
++import monoDark from "./assets/mono-dark.json" with { type: "json" }
++import monoLight from "./assets/mono-light.json" with { type: "json" }
++import monolith from "./assets/monolith.json" with { type: "json" }
++import press from "./assets/press.json" with { type: "json" }
+ 
+ export type Theme = {
+   readonly primary: RGBA
+@@ -128,39 +100,11 @@ export type ThemeJson = {
  }
  
  export const DEFAULT_THEMES: Record<string, ThemeJson> = {
+-  aura,
+-  ayu,
+-  catppuccin,
+-  ["catppuccin-frappe"]: catppuccinFrappe,
+-  ["catppuccin-macchiato"]: catppuccinMacchiato,
+-  cobalt2,
+-  cursor,
+-  dracula,
+-  everforest,
+-  flexoki,
+-  github,
+-  gruvbox,
+-  kanagawa,
+-  material,
+-  matrix,
+-  mercury,
+-  monokai,
+-  nightowl,
+-  nord,
+-  ["one-dark"]: onedark,
+-  ["osaka-jade"]: osakaJade,
+-  opencode,
+-  orng,
+-  ["lucent-orng"]: lucentOrng,
+-  palenight,
+-  rosepine,
+-  solarized,
+-  synthwave84,
+-  tokyonight,
+-  vesper,
+-  vercel,
+-  zenburn,
+-  carbonfox,
 +  athena,
-   aura,
-   ayu,
-   catppuccin,
++  ["mono-dark"]: monoDark,
++  ["mono-light"]: monoLight,
++  monolith,
++  press,
+ }
+ 
+ const pluginThemes: Record<string, ThemeJson> = {}
 diff --git a/packages/tui/src/ui/link.tsx b/packages/tui/src/ui/link.tsx
 index cfd78bc..7729823 100644
 --- a/packages/tui/src/ui/link.tsx
