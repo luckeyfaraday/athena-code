@@ -21,7 +21,7 @@ facts for each turn; and indexes prior conversations for later search.
 
 A short look at the Athena Code terminal UI:
 
-https://github.com/user-attachments/assets/694b0ed3-a261-49a0-a0e9-1241a2c206fa
+https://github.com/user-attachments/assets/1a889b43-f227-42fe-b236-1df80665ab39
 
 ## Why Athena Code?
 
