@@ -85,7 +85,25 @@ done
 cp -R "$ROOT/overlay/." "$SOURCE/"
 
 cd "$SOURCE"
-npx --yes bun@1.3.14 install --frozen-lockfile
+# bun install resolves git dependencies (e.g. ghostty-web pinned to a branch) by
+# fetching tarballs from the GitHub API, which intermittently returns 5xx and
+# fails the whole release. Retry with backoff so a transient blip doesn't sink a
+# tagged build; a genuinely broken lockfile still fails after the last attempt.
+bun_install() {
+  local attempt
+  for attempt in 1 2 3; do
+    if npx --yes bun@1.3.14 install --frozen-lockfile; then
+      return 0
+    fi
+    if [[ "$attempt" -lt 3 ]]; then
+      echo "bun install failed (attempt $attempt/3); retrying in $((attempt * 10))s..." >&2
+      sleep "$((attempt * 10))"
+    fi
+  done
+  echo "error: bun install failed after 3 attempts." >&2
+  return 1
+}
+bun_install
 OPENCODE_VERSION="$VERSION" npx --yes bun@1.3.14 run --cwd packages/opencode script/build.ts --single --skip-install --skip-embed-web-ui
 mkdir -p "$ROOT/runtime-bin/$TARGET"
 cp "packages/opencode/dist/opencode-$UPSTREAM_TARGET/bin/$EXECUTABLE" "$ROOT/runtime-bin/$TARGET/$OUTPUT_NAME"
