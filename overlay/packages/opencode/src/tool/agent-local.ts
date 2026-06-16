@@ -214,6 +214,7 @@ export const SessionTakeoverTool = tool({
       agent: args.agent,
       sessionId: args.session_id,
       workspace: args.workspace,
+      fallbackWorkspace: normalizeWorktree(context),
       where: args.where,
     })
     switch (plan.status) {

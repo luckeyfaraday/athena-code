@@ -429,13 +429,14 @@ test("session takeover plans an in-app handover and resolves the indexed workspa
 test("session takeover terminal mode resumes athena through this binary and delegates others", () => {
   process.env.ATHENA_CODE_HOME = workspace("athhome-takeover-term-")
   const ws = workspace("athtakeover-ws-")
+  const claudeWs = workspace("athtakeover-claude-")
   indexMessages(ws, [{ sessionId: "live-2", role: "user", ts: "msg-1", text: "draft the migration plan" }])
   indexScannedSessions("claude", [
     {
       sourceId: "claude-1",
       sourcePath: "/fixtures/claude/claude-1.jsonl",
       fingerprint: "1:1",
-      workspace: "/home/x/proj",
+      workspace: claudeWs,
       messages: [{ role: "user", ts: "t1", text: "tighten the rate limiter" }],
     },
   ])
@@ -454,9 +455,33 @@ test("session takeover terminal mode resumes athena through this binary and dele
     status: "terminal",
     agent: "claude",
     sessionId: "claude-1",
-    workspace: "/home/x/proj",
+    workspace: claudeWs,
     command: "claude",
     args: ["--resume", "claude-1"],
+  })
+})
+
+test("session takeover terminal mode falls back when the indexed workspace is stale", () => {
+  process.env.ATHENA_CODE_HOME = workspace("athhome-takeover-stale-")
+  const fallback = workspace("athtakeover-fallback-")
+  const stale = join(tmpdir(), `athena-missing-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  indexScannedSessions("codex", [
+    {
+      sourceId: "codex-stale",
+      sourcePath: "/fixtures/codex/codex-stale.jsonl",
+      fingerprint: "1:1",
+      workspace: stale,
+      messages: [{ role: "user", ts: "t1", text: "resume from a stale workspace" }],
+    },
+  ])
+
+  expect(planSessionTakeover({ agent: "codex", sessionId: "codex-stale", where: "terminal", fallbackWorkspace: fallback })).toEqual({
+    status: "terminal",
+    agent: "codex",
+    sessionId: "codex-stale",
+    workspace: fallback,
+    command: "codex",
+    args: ["resume", "--cd", fallback, "codex-stale"],
   })
 })
 

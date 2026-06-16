@@ -8,7 +8,8 @@
 // logic is unit-testable without the plugin/bus glue: the tool wrapper in
 // tool/agent-local.ts performs the GlobalBus.emit / openVisibleTerminal.
 
-import { localAgentResumeCommand, type LocalAgentKind } from "./local"
+import { statSync } from "node:fs"
+import { localAgentResumeCommand } from "./local"
 import { indexedSessionWorkspace } from "../memory/sessionindex"
 
 // Every agent the cross-agent index can hold: athena's own sessions plus the
@@ -34,6 +35,20 @@ function takeoverResumeCommand(
   return localAgentResumeCommand(agent, sessionId, workspace)
 }
 
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+function launchWorkspace(workspace: string, fallbackWorkspace?: string): string {
+  if (workspace && isDirectory(workspace)) return workspace
+  const fallback = fallbackWorkspace?.trim() || process.cwd()
+  return fallback && isDirectory(fallback) ? fallback : process.cwd()
+}
+
 export type SessionTakeoverPlan =
   | { status: "unknown-agent"; agent: string }
   | { status: "not-found"; agent: TakeoverAgent; sessionId: string }
@@ -48,6 +63,7 @@ export function planSessionTakeover(params: {
   agent: string
   sessionId: string
   workspace?: string
+  fallbackWorkspace?: string
   where?: "in_app" | "terminal"
 }): SessionTakeoverPlan {
   const agent = params.agent.trim().toLowerCase()
@@ -57,7 +73,8 @@ export function planSessionTakeover(params: {
   if (indexedWorkspace === null) return { status: "not-found", agent, sessionId }
   const workspace = params.workspace?.trim() || indexedWorkspace
   if (params.where === "terminal") {
-    return { status: "terminal", agent, sessionId, workspace, ...takeoverResumeCommand(agent, sessionId, workspace) }
+    const cwd = launchWorkspace(workspace, params.fallbackWorkspace)
+    return { status: "terminal", agent, sessionId, workspace: cwd, ...takeoverResumeCommand(agent, sessionId, cwd) }
   }
   return { status: "in_app", agent, sessionId, workspace }
 }
