@@ -80,6 +80,8 @@ export const AgentSpawnTool = tool({
         command: spec.command,
         args: spec.args,
         sessionId: spec.sessionId,
+        pid: launch.pid,
+        pidFile: launch.pidFile,
       })
       const note = spec.promptInjected
         ? `The task prompt was pre-submitted.`
@@ -87,7 +89,9 @@ export const AgentSpawnTool = tool({
       return {
         title: "Agent opened in terminal",
         metadata: { handle: record.handle, terminal: launch.terminal },
-        output: `${render(record)}\nOpened in a new ${launch.terminal} window. ${note} Output is not captured for visible agents.`,
+        output: `${render(record)}\nOpened in a new ${launch.terminal} window. ${note} Output is not captured for visible agents.${
+          launch.pid || launch.pidFile ? ` Close the window with agent_stop ${record.handle}.` : ""
+        }`,
       }
     }
     const record = spawnLocalAgent({ agent, task: args.task, workspace })
@@ -146,10 +150,14 @@ export const AgentTakeoverTool = tool({
         return { title: "Terminal launch failed", metadata: { error: true }, output: launch.error ?? "Could not open a terminal window." }
       }
       record.visible = true
+      record.terminalPid = launch.pid
+      record.terminalPidFile = launch.pidFile
       return {
         title: "Session opened in terminal",
         metadata: { handle: record.handle, sessionId, terminal: launch.terminal },
-        output: `Resumed ${record.agent} session ${sessionId} in a new ${launch.terminal} window.`,
+        output: `Resumed ${record.agent} session ${sessionId} in a new ${launch.terminal} window.${
+          launch.pid || launch.pidFile ? ` Close it later with agent_stop ${record.handle}.` : ""
+        }`,
       }
     }
     GlobalBus.emit("event", {
@@ -224,13 +232,13 @@ export const AgentMessageTool = tool({
 })
 
 export const AgentStopTool = tool({
-  description: "Stop a running local agent spawned by Athena Code. Use when the user asks to stop, kill, or terminate a specific spawned agent handle.",
+  description: "Stop a local agent spawned by Athena Code. Kills a headless agent process, or closes the window of an agent opened in a visible terminal (on Linux/BSD). Use when the user asks to stop, kill, terminate, or close a specific spawned agent handle.",
   args: {
     handle: tool.schema.string().describe('Agent handle, for example "claude#1" or "codex#1".'),
   },
   async execute(args) {
     const record = getLocalAgent(args.handle)
-    const ok = stopLocalAgent(args.handle)
+    const ok = await stopLocalAgent(args.handle)
     return { title: ok ? "Agent stopped" : "Agent not running", metadata: { handle: args.handle, ok }, output: record ? render(record) : `${args.handle} does not exist.` }
   },
 })

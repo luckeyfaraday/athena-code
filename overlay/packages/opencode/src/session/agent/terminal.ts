@@ -4,12 +4,23 @@
 // known emulator found on PATH per platform.
 
 import { spawn, spawnSync } from "node:child_process"
-import { basename, delimiter, join } from "node:path"
+import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { basename, delimiter, join } from "node:path"
 
 export type TerminalLaunch = {
   ok: boolean
   terminal?: string
+  // PID of the command running inside the visible terminal, when known at
+  // launch time. This is intentionally not the emulator launcher PID because
+  // common terminals hand work to a server process and then exit.
+  pid?: number
+  // On Linux the visible command writes its PID here from inside the terminal;
+  // callers can read it later if it was not available before this function
+  // returned. Undefined on macOS/Windows where closing the window is not yet
+  // supported reliably.
+  pidFile?: string
   error?: string
 }
 
@@ -70,7 +81,11 @@ function shellQuote(token: string): string {
   return `'${token.replace(/'/g, `'\\''`)}'`
 }
 
-function launchDetached(argv: string[], cwd: string): TerminalLaunch {
+function withPidCapture(argv: string[], pidFile: string): string[] {
+  return ["sh", "-c", 'pidfile=$1; shift; printf "%s\\n" "$$" > "$pidfile"; exec "$@"', "athena-terminal", pidFile, ...argv]
+}
+
+function launchDetached(argv: string[], cwd: string, pidFile?: string): TerminalLaunch {
   try {
     const child = spawn(argv[0]!, argv.slice(1), {
       cwd,
@@ -80,7 +95,7 @@ function launchDetached(argv: string[], cwd: string): TerminalLaunch {
     })
     child.on("error", () => {})
     child.unref()
-    return { ok: true, terminal: basename(argv[0]!) }
+    return { ok: true, terminal: basename(argv[0]!), pidFile }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
@@ -115,5 +130,6 @@ export function openVisibleTerminal(argv: string[], cwd: string): TerminalLaunch
       error: "No terminal emulator found on PATH (set ATHENA_TERMINAL to your terminal command).",
     }
   }
-  return launchDetached(emulatorArgv(candidates[0]!, argv, cwd), cwd)
+  const pidFile = join(tmpdir(), `athena-terminal-${randomUUID()}.pid`)
+  return launchDetached(emulatorArgv(candidates[0]!, withPidCapture(argv, pidFile), cwd), cwd, pidFile)
 }

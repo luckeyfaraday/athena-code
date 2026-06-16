@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test"
-import { mkdtempSync } from "node:fs"
+import { spawn } from "node:child_process"
+import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
@@ -15,8 +16,10 @@ import {
   resolveLocalAgentSessionId,
   respawnLocalAgent,
   spawnLocalAgentCommand,
+  stopLocalAgent,
   waitLocalAgent,
 } from "../overlay/packages/opencode/src/session/agent/local"
+import { openVisibleTerminal } from "../overlay/packages/opencode/src/session/agent/terminal"
 
 function workspace(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))
@@ -249,6 +252,90 @@ test("visible agents are listed but not resumed headless", async () => {
   expect(localAgentTakeoverBlockReason(record)).toBe("terminal")
   expect(messageLocalAgent(record.handle, "hello")).toBe(false)
   expect((await continueLocalAgent(record.handle, "hello")).status).toBe("terminal")
+})
+
+test("stopLocalAgent keeps untracked visible terminals blocked", async () => {
+  const record = registerVisibleAgent({
+    agent: "claude",
+    task: "visible run",
+    workspace: workspace("athagent-"),
+    command: "claude",
+    args: ["visible run"],
+    sessionId: "uuid-2",
+  })
+
+  expect(await stopLocalAgent(record.handle)).toBe(false)
+  expect(record.visible).toBe(true)
+  expect(record.exitedAt).toBeUndefined()
+  expect(localAgentTakeoverBlockReason(record)).toBe("terminal")
+})
+
+test("stopLocalAgent closes visible agents with a tracked pid", async () => {
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+    detached: true,
+    stdio: "ignore",
+  })
+  const pid = child.pid!
+  const closed = new Promise<void>((resolve) => child.once("close", () => resolve()))
+  const record = registerVisibleAgent({
+    agent: "claude",
+    task: "visible run",
+    workspace: workspace("athagent-"),
+    command: process.execPath,
+    args: [],
+    pid,
+    sessionId: "uuid-3",
+  })
+
+  try {
+    expect(await stopLocalAgent(record.handle)).toBe(true)
+    await closed
+    expect(record.visible).toBe(false)
+    expect(record.exitedAt).toBeDefined()
+    expect(record.signal).toBe("SIGTERM")
+  } finally {
+    try {
+      process.kill(-pid, "SIGKILL")
+    } catch {}
+  }
+})
+
+test("openVisibleTerminal tracks Linux command pid through a pid file", async () => {
+  if (process.platform !== "linux") return
+  const dir = workspace("athagent-terminal-")
+  const terminal = join(dir, "fake-terminal")
+  writeFileSync(terminal, '#!/bin/sh\nif [ "$1" = "-e" ]; then shift; fi\nexec "$@"\n', { mode: 0o755 })
+
+  const previousAthenaTerminal = process.env.ATHENA_TERMINAL
+  const previousTerminal = process.env.TERMINAL
+  process.env.ATHENA_TERMINAL = terminal
+  delete process.env.TERMINAL
+  try {
+    const launch = openVisibleTerminal([process.execPath, "-e", "setInterval(() => {}, 1000)"], dir)
+    expect(launch.ok).toBe(true)
+    expect(launch.pid).toBeUndefined()
+    expect(launch.pidFile).toBeDefined()
+
+    const record = registerVisibleAgent({
+      agent: "claude",
+      task: "visible run",
+      workspace: dir,
+      command: process.execPath,
+      args: [],
+      pid: launch.pid,
+      pidFile: launch.pidFile,
+      sessionId: "uuid-4",
+    })
+
+    expect(await stopLocalAgent(record.handle)).toBe(true)
+    expect(record.terminalPid).toBeGreaterThan(0)
+    expect(record.visible).toBe(false)
+  } finally {
+    if (previousAthenaTerminal === undefined) delete process.env.ATHENA_TERMINAL
+    else process.env.ATHENA_TERMINAL = previousAthenaTerminal
+    if (previousTerminal === undefined) delete process.env.TERMINAL
+    else process.env.TERMINAL = previousTerminal
+  }
 })
 
 test("one-shot agents get stdin closed so stdin-draining CLIs exit", async () => {
