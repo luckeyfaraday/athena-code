@@ -20,6 +20,8 @@ import {
   waitLocalAgent,
 } from "../overlay/packages/opencode/src/session/agent/local"
 import { openVisibleTerminal } from "../overlay/packages/opencode/src/session/agent/terminal"
+import { planSessionTakeover } from "../overlay/packages/opencode/src/session/agent/session-takeover"
+import { indexMessages, indexScannedSessions } from "../overlay/packages/opencode/src/session/memory/sessionindex"
 
 function workspace(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))
@@ -402,4 +404,113 @@ test("output offsets stay absolute across buffer truncation", async () => {
   expect(stale.truncated).toBe(true)
   expect(stale.text.length).toBe(max)
   expect(stale.nextOffset).toBe(total)
+})
+
+// session_takeover splits into a pure planner (validation + resume command +
+// the exact properties later emitted on the takeover event) and a thin tool
+// wrapper that performs GlobalBus.emit / openVisibleTerminal. The wrapper pulls
+// in @opencode-ai/plugin and the bus, which are absent from this standalone
+// overlay, so these tests exercise the planner — the in_app plan's fields are
+// the takeover event payload verbatim.
+
+test("session takeover plans an in-app handover and resolves the indexed workspace", () => {
+  process.env.ATHENA_CODE_HOME = workspace("athhome-takeover-inapp-")
+  const ws = workspace("athtakeover-ws-")
+  indexMessages(ws, [{ sessionId: "live-1", role: "user", ts: "msg-1", text: "wire the exporter into the gateway" }])
+
+  expect(planSessionTakeover({ agent: "athena", sessionId: "live-1" })).toEqual({
+    status: "in_app",
+    agent: "athena",
+    sessionId: "live-1",
+    workspace: ws,
+  })
+})
+
+test("session takeover terminal mode resumes athena through this binary and delegates others", () => {
+  process.env.ATHENA_CODE_HOME = workspace("athhome-takeover-term-")
+  const ws = workspace("athtakeover-ws-")
+  const claudeWs = workspace("athtakeover-claude-")
+  indexMessages(ws, [{ sessionId: "live-2", role: "user", ts: "msg-1", text: "draft the migration plan" }])
+  indexScannedSessions("claude", [
+    {
+      sourceId: "claude-1",
+      sourcePath: "/fixtures/claude/claude-1.jsonl",
+      fingerprint: "1:1",
+      workspace: claudeWs,
+      messages: [{ role: "user", ts: "t1", text: "tighten the rate limiter" }],
+    },
+  ])
+
+  // athena is not a spawnable agent, so localAgentResumeCommand omits it; the
+  // planner resumes it through this binary (process.execPath), as the TUI does.
+  expect(planSessionTakeover({ agent: "athena", sessionId: "live-2", where: "terminal" })).toEqual({
+    status: "terminal",
+    agent: "athena",
+    sessionId: "live-2",
+    workspace: ws,
+    command: process.execPath,
+    args: [ws, "--session", "live-2"],
+  })
+  expect(planSessionTakeover({ agent: "claude", sessionId: "claude-1", where: "terminal" })).toEqual({
+    status: "terminal",
+    agent: "claude",
+    sessionId: "claude-1",
+    workspace: claudeWs,
+    command: "claude",
+    args: ["--resume", "claude-1"],
+  })
+})
+
+test("session takeover terminal mode falls back when the indexed workspace is stale", () => {
+  process.env.ATHENA_CODE_HOME = workspace("athhome-takeover-stale-")
+  const fallback = workspace("athtakeover-fallback-")
+  const stale = join(tmpdir(), `athena-missing-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  indexScannedSessions("codex", [
+    {
+      sourceId: "codex-stale",
+      sourcePath: "/fixtures/codex/codex-stale.jsonl",
+      fingerprint: "1:1",
+      workspace: stale,
+      messages: [{ role: "user", ts: "t1", text: "resume from a stale workspace" }],
+    },
+  ])
+
+  expect(planSessionTakeover({ agent: "codex", sessionId: "codex-stale", where: "terminal", fallbackWorkspace: fallback })).toEqual({
+    status: "terminal",
+    agent: "codex",
+    sessionId: "codex-stale",
+    workspace: fallback,
+    command: "codex",
+    args: ["resume", "--cd", fallback, "codex-stale"],
+  })
+})
+
+test("session takeover honors an explicit workspace override", () => {
+  process.env.ATHENA_CODE_HOME = workspace("athhome-takeover-override-")
+  const ws = workspace("athtakeover-ws-")
+  indexMessages(ws, [{ sessionId: "live-3", role: "user", ts: "msg-1", text: "check the deploy" }])
+
+  expect(planSessionTakeover({ agent: "athena", sessionId: "live-3", workspace: "/elsewhere" })).toEqual({
+    status: "in_app",
+    agent: "athena",
+    sessionId: "live-3",
+    workspace: "/elsewhere",
+  })
+})
+
+test("session takeover rejects unknown agents and stale session ids", () => {
+  process.env.ATHENA_CODE_HOME = workspace("athhome-takeover-reject-")
+  const ws = workspace("athtakeover-ws-")
+  indexMessages(ws, [{ sessionId: "live-4", role: "user", ts: "msg-1", text: "anything indexed" }])
+
+  expect(planSessionTakeover({ agent: "gemini", sessionId: "live-4" })).toEqual({
+    status: "unknown-agent",
+    agent: "gemini",
+  })
+  // A known agent but an id absent from the index (a stale recall result).
+  expect(planSessionTakeover({ agent: "athena", sessionId: "ghost" })).toEqual({
+    status: "not-found",
+    agent: "athena",
+    sessionId: "ghost",
+  })
 })
