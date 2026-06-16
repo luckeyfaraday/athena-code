@@ -81,6 +81,7 @@ export const AgentSpawnTool = tool({
         args: spec.args,
         sessionId: spec.sessionId,
         pid: launch.pid,
+        pidFile: launch.pidFile,
       })
       const note = spec.promptInjected
         ? `The task prompt was pre-submitted.`
@@ -89,7 +90,7 @@ export const AgentSpawnTool = tool({
         title: "Agent opened in terminal",
         metadata: { handle: record.handle, terminal: launch.terminal },
         output: `${render(record)}\nOpened in a new ${launch.terminal} window. ${note} Output is not captured for visible agents.${
-          launch.pid ? ` Close the window with agent_stop ${record.handle}.` : ""
+          launch.pid || launch.pidFile ? ` Close the window with agent_stop ${record.handle}.` : ""
         }`,
       }
     }
@@ -150,11 +151,12 @@ export const AgentTakeoverTool = tool({
       }
       record.visible = true
       record.terminalPid = launch.pid
+      record.terminalPidFile = launch.pidFile
       return {
         title: "Session opened in terminal",
         metadata: { handle: record.handle, sessionId, terminal: launch.terminal },
         output: `Resumed ${record.agent} session ${sessionId} in a new ${launch.terminal} window.${
-          launch.pid ? ` Close it later with agent_stop ${record.handle}.` : ""
+          launch.pid || launch.pidFile ? ` Close it later with agent_stop ${record.handle}.` : ""
         }`,
       }
     }
@@ -236,7 +238,7 @@ export const AgentStopTool = tool({
   },
   async execute(args) {
     const record = getLocalAgent(args.handle)
-    const ok = stopLocalAgent(args.handle)
+    const ok = await stopLocalAgent(args.handle)
     return { title: ok ? "Agent stopped" : "Agent not running", metadata: { handle: args.handle, ok }, output: record ? render(record) : `${args.handle} does not exist.` }
   },
 })

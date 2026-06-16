@@ -1,8 +1,9 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync, unlinkSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { setTimeout as sleep } from "node:timers/promises"
 
 export type LocalAgentKind = "claude" | "codex" | "opencode" | "hermes"
 
@@ -28,11 +29,12 @@ export type LocalAgentRecord = {
   // True when the agent runs interactively in its own terminal window: no
   // stdout/stderr is captured and stdin cannot be messaged.
   visible?: boolean
-  // PID of the visible terminal emulator (process-group leader on POSIX), set
-  // when the window was launched with a killable handle. Lets stopLocalAgent
-  // close the window. Undefined on macOS/Windows where the window isn't a
-  // process we own.
+  // PID of the command running inside a visible terminal, when known. Killing
+  // this process/group lets the terminal close once the command exits.
   terminalPid?: number
+  // Linux visible-terminal launches write the command PID here from inside the
+  // terminal because many emulator launcher processes exit immediately.
+  terminalPidFile?: string
   stdout: string
   stderr: string
   // Characters trimmed from the front of each buffer once it exceeds
@@ -269,6 +271,8 @@ export function respawnLocalAgent(
   record.command = spec.command
   record.args = spec.args
   record.visible = false
+  record.terminalPid = undefined
+  discardTerminalPidFile(record)
   const child = spawn(spec.command, spec.args, {
     cwd: record.workspace,
     env: process.env,
@@ -341,32 +345,99 @@ export function readLocalAgentOutput(
   }
 }
 
-// Close a visible terminal window we launched. The emulator was spawned
-// detached (a process-group leader on POSIX), so signalling the negated PID
-// tears down the whole group — the window and the agent CLI running inside it.
-// Falls back to a plain single-PID kill if the group signal is rejected.
-function closeVisibleTerminal(record: LocalAgentRecord): boolean {
-  if (record.terminalPid == null) return false
-  let closed = false
-  try {
-    process.kill(-record.terminalPid, "SIGTERM")
-    closed = true
-  } catch {
-    try {
-      process.kill(record.terminalPid, "SIGTERM")
-      closed = true
-    } catch {
-      closed = false
-    }
-  }
-  if (closed) {
-    record.visible = false
-    record.exitedAt = new Date().toISOString()
-  }
-  return closed
+function markVisibleExited(record: LocalAgentRecord, signal: NodeJS.Signals | null): void {
+  record.visible = false
+  record.exitedAt = new Date().toISOString()
+  record.exitCode = null
+  record.signal = signal
 }
 
-export function stopLocalAgent(handle: string): boolean {
+// Remove the terminal PID file from tmp and forget it. Safe to call when no
+// file is tracked; swallows unlink errors (already gone, or never written).
+function discardTerminalPidFile(record: LocalAgentRecord): void {
+  if (!record.terminalPidFile) return
+  try {
+    unlinkSync(record.terminalPidFile)
+  } catch {}
+  record.terminalPidFile = undefined
+}
+
+function readTerminalPidFile(record: LocalAgentRecord): number | undefined {
+  if (!record.terminalPidFile) return undefined
+  try {
+    const pid = Number.parseInt(readFileSync(record.terminalPidFile, "utf8").trim(), 10)
+    if (!Number.isSafeInteger(pid) || pid <= 0) return undefined
+    record.pid = pid
+    record.terminalPid = pid
+    discardTerminalPidFile(record)
+    return pid
+  } catch {
+    return undefined
+  }
+}
+
+async function resolveVisibleTerminalPid(record: LocalAgentRecord, timeoutMs: number): Promise<number | undefined> {
+  if (record.terminalPid != null) return record.terminalPid
+  const deadline = Date.now() + timeoutMs
+  do {
+    const pid = readTerminalPidFile(record)
+    if (pid != null) return pid
+    if (!record.terminalPidFile) return undefined
+    await sleep(50)
+  } while (Date.now() < deadline)
+  return readTerminalPidFile(record)
+}
+
+function processExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error instanceof Error && "code" in error && error.code !== "ESRCH"
+  }
+}
+
+async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  do {
+    if (!processExists(pid)) return true
+    await sleep(50)
+  } while (Date.now() < deadline)
+  return !processExists(pid)
+}
+
+function signalVisiblePid(pid: number): boolean {
+  try {
+    process.kill(-pid, "SIGTERM")
+    return true
+  } catch {
+    try {
+      process.kill(pid, "SIGTERM")
+      return true
+    } catch {
+      return false
+    }
+  }
+}
+
+// Close a visible terminal by terminating the foreground command running inside
+// it. Linux launches track that command via a PID file so server-style terminal
+// emulators don't leave us holding a short-lived launcher PID. The record only
+// becomes reusable after the tracked process is observed gone.
+async function closeVisibleTerminal(record: LocalAgentRecord): Promise<boolean> {
+  const pid = await resolveVisibleTerminalPid(record, 1000)
+  if (pid == null) return false
+  if (!processExists(pid)) {
+    markVisibleExited(record, null)
+    return true
+  }
+  if (!signalVisiblePid(pid)) return false
+  if (!(await waitForProcessExit(pid, 1500))) return false
+  markVisibleExited(record, "SIGTERM")
+  return true
+}
+
+export async function stopLocalAgent(handle: string): Promise<boolean> {
   const record = agents.get(handle)
   if (!record) return false
   if (record.visible) return closeVisibleTerminal(record)
@@ -385,6 +456,7 @@ export function registerVisibleAgent(params: {
   command: string
   args: string[]
   pid?: number
+  pidFile?: string
   sessionId?: string
 }): LocalAgentRecord {
   const record: LocalAgentRecord = {
@@ -399,6 +471,7 @@ export function registerVisibleAgent(params: {
     sessionId: params.sessionId,
     visible: true,
     terminalPid: params.pid,
+    terminalPidFile: params.pidFile,
     stdout: "",
     stderr: "",
     stdoutDropped: 0,
