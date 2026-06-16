@@ -219,6 +219,24 @@ export function athenaOwnedSessionIds(ids: string[]): Set<string> {
   }
 }
 
+// Workspace recorded in the cross-agent index for (agent, sessionId), or null
+// when no such session is indexed. session_takeover uses this to validate a
+// recalled session id before handing the terminal over — a stale id returns a
+// clean error instead of a silently dropped handover — and to resume the
+// session in its own original workspace rather than the current one.
+export function indexedSessionWorkspace(agent: string, sessionId: string): string | null {
+  const db = openReadonly()
+  if (!db) return null
+  try {
+    const row = db
+      .query("SELECT workspace FROM messages WHERE agent = ? AND session_id = ? LIMIT 1")
+      .get(agent, sessionId) as { workspace: string } | null
+    return row?.workspace ?? null
+  } finally {
+    db.close()
+  }
+}
+
 // Index a batch of scanned prior sessions for one agent. Message inserts are
 // INSERT OR IGNORE, so rescanning an append-only session file adds only the
 // new turns; the source fingerprint is upserted alongside.

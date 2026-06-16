@@ -19,6 +19,7 @@ import {
   type LocalAgentRecord,
 } from "../session/agent/local"
 import { openVisibleTerminal } from "../session/agent/terminal"
+import { planSessionTakeover } from "../session/agent/session-takeover"
 
 const AGENTS = ["claude", "codex", "opencode", "hermes"] as const
 
@@ -176,6 +177,92 @@ export const AgentTakeoverTool = tool({
       title: "Handing over session",
       metadata: { handle: record.handle, sessionId },
       output: `Handing this terminal over to ${record.agent} session ${sessionId}. Athena Code returns when the user exits ${record.agent}; after that, agent_message ${record.handle} continues the same session (including the user's interactive turns). If nothing happens (e.g. no TUI attached), the user can run /find-sessions instead.`,
+    }
+  },
+})
+
+// Sibling of AgentTakeoverTool for sessions the model found via session_recall
+// rather than spawned itself: those have no in-memory handle, so this resolves
+// the recalled { agent, session_id } against the cross-agent index and reuses
+// the very same in-app handover event (or opens a visible terminal).
+export const SessionTakeoverTool = tool({
+  description:
+    "Take over a past session found via session_recall (or one the user names) in THIS terminal: the current " +
+    "Athena Code pane suspends and resumes that session in place, returning here when the user exits it. Use for " +
+    '"take over here", "continue this here", "open it here", or "resume that session" about a recalled or historical ' +
+    "session. Unlike agent_takeover, this does NOT require a live agent_spawn handle — it works for any indexed " +
+    "session across athena, claude, codex, opencode, and hermes. where=in_app (default) swaps this pane; " +
+    "where=terminal opens the resumed session in a new visible terminal window instead.",
+  args: {
+    agent: tool.schema
+      .string()
+      .describe('Agent that owns the session, from session_recall: "athena", "claude", "codex", "opencode", or "hermes".'),
+    session_id: tool.schema.string().describe("Session id to resume, as reported by session_recall."),
+    workspace: tool.schema
+      .string()
+      .optional()
+      .describe("Session workspace from session_recall. Omit to resume in the workspace recorded for that session."),
+    where: tool.schema
+      .enum(["in_app", "terminal"])
+      .optional()
+      .describe(
+        '"in_app" (default) suspends this terminal and resumes the session in place; "terminal" opens it in a new visible terminal window.',
+      ),
+  },
+  async execute(args, context) {
+    const plan = planSessionTakeover({
+      agent: args.agent,
+      sessionId: args.session_id,
+      workspace: args.workspace,
+      where: args.where,
+    })
+    switch (plan.status) {
+      case "unknown-agent":
+        return {
+          title: "Unknown agent",
+          metadata: { error: true, agent: plan.agent },
+          output: `Unknown agent ${JSON.stringify(args.agent)}. Use one of: athena, claude, codex, opencode, hermes.`,
+        }
+      case "not-found":
+        return {
+          title: "Session not found",
+          metadata: { error: true, agent: plan.agent, sessionId: plan.sessionId },
+          output:
+            `No indexed ${plan.agent} session ${plan.sessionId}. The id may be stale or mistyped — run session_recall ` +
+            `again for a current id, or /find-sessions to locate it manually.`,
+        }
+      case "terminal": {
+        const launch = openVisibleTerminal([plan.command, ...plan.args], plan.workspace)
+        if (!launch.ok) {
+          return { title: "Terminal launch failed", metadata: { error: true }, output: launch.error ?? "Could not open a terminal window." }
+        }
+        return {
+          title: "Session opened in terminal",
+          metadata: { agent: plan.agent, sessionId: plan.sessionId, terminal: launch.terminal, workspace: plan.workspace },
+          output: `Resumed ${plan.agent} session ${plan.sessionId} in a new ${launch.terminal} window (workspace ${plan.workspace}).`,
+        }
+      }
+      case "in_app":
+        GlobalBus.emit("event", {
+          directory: context.directory,
+          payload: {
+            type: TAKEOVER_EVENT,
+            properties: {
+              agent: plan.agent,
+              sessionId: plan.sessionId,
+              workspace: plan.workspace,
+              requestSessionID: context.sessionID,
+            },
+          },
+        })
+        return {
+          title: "Handing over session",
+          metadata: { agent: plan.agent, sessionId: plan.sessionId, workspace: plan.workspace },
+          output:
+            `Suspending this terminal into ${plan.agent} session ${plan.sessionId} (workspace ${plan.workspace}). ` +
+            `Athena Code returns when the user exits ${plan.agent}. If nothing happens (e.g. no TUI is attached), ` +
+            `the user can run /find-sessions instead.`,
+        }
     }
   },
 })
