@@ -38,8 +38,11 @@ local-first memory layer directly to the agent loop:
   Codex, opencode, and Hermes session stores when present.
 - **Frozen session context:** build one deterministic memory snapshot per
   session and reuse it across tool calls.
-- **Native agent tools:** expose `memory_write`, `memory_read`, and
+- **Native memory tools:** expose `memory_write`, `memory_read`, and
   `session_recall` to the model.
+- **Local agent orchestration:** spawn and coordinate Claude Code, Codex,
+  opencode, and Hermes as subagents (headless or in visible terminals), and take
+  over a recalled session in place — all from agent tools.
 - **Local-first storage:** memory and recall data stay in local files by
   default; the memory hot path requires no Athena backend service.
 - **Open agent loop:** built on the open-source OpenCode terminal coding agent.
@@ -185,6 +188,35 @@ other secrets in agent memory.
 
 For the design rationale, see
 [Athena Turn-Ownership Memory Design](docs/athena-turn-ownership-design.md).
+
+## Agent Tools
+
+Beyond the memory layer, Athena Code exposes a set of native tools to the model
+so it can manage memory, search history, and coordinate other local agents:
+
+| Tool | Purpose |
+|---|---|
+| `memory_write` | Save a durable global memory for future sessions |
+| `memory_read` | Read back stored memories |
+| `session_recall` | Retrieve relevant excerpts from indexed past sessions |
+| `agent_spawn` | Spawn Claude Code, Codex, opencode, or Hermes as a subagent (headless, or in a visible terminal window) |
+| `agent_list` | List local agents spawned by this process |
+| `agent_message` | Send a follow-up message to a spawned agent |
+| `agent_output` | Read captured stdout/stderr from a headless agent |
+| `agent_wait` | Wait for a one-shot agent to finish and return its output |
+| `agent_stop` | Stop a headless agent or close a visible agent's terminal window |
+| `agent_takeover` | Swap the current terminal to drive a spawned agent in place |
+| `session_takeover` | Resume a recalled `{ agent, session_id }` in place, like selecting it from `/find-sessions` |
+
+Inside the terminal UI, the `/find-sessions` command opens the cross-agent
+session search dialog backed by the local session index.
+
+### Permissions
+
+By default Athena Code runs permissionless: tool-call permission prompts are
+bypassed so the agent loop runs uninterrupted. User-defined permission rules in
+your config still take precedence, so you can add rules to require approval for
+specific tools or commands.
 
 ## Architecture
 
