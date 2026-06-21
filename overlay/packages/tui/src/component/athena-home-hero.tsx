@@ -1,4 +1,4 @@
-// The home screen masthead — the owl IS the logo (docs/ui-identity-design.md):
+// The home screen masthead — the owl IS the logo:
 // the perched braille owl with a single letterspaced wordmark line under it,
 // nothing else. The owl swoops in once per launch (AthenaMastheadOwl) — that
 // flight is the startup animation. (The matching send-off when the first

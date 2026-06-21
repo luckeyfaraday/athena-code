@@ -1,4 +1,4 @@
-// The weave — Athena's working animation (docs/ui-identity-design.md),
+// The weave — Athena's working animation,
 // replacing the upstream knight-rider scanner via a swap hunk in
 // component/prompt/index.tsx. Frame strings come from athena-identity.ts;
 // this file maps each glyph to a color: the shuttle carries the full agent

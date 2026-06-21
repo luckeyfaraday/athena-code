@@ -1,5 +1,5 @@
-// The command room — the home screen's identity block under the prompt
-// (docs/ui-identity-design.md): a few lines of true numbers and the day's
+// The command room — the home screen's identity block under the prompt:
+// a few lines of true numbers and the day's
 // maxim. Every data line is real (cross-agent session index, git branch);
 // lines without data are omitted rather than rendered as zeros. The owl lives
 // in the masthead above the prompt (athena-home-hero.tsx), and the memory

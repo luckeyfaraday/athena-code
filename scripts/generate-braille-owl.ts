@@ -1,5 +1,5 @@
-// Design-time generator for the owl's braille stipple frames
-// (docs/ui-identity-design.md). Run with: npx bun scripts/generate-braille-owl.ts
+// Design-time generator for the owl's braille stipple frames.
+// Run with: npx bun scripts/generate-braille-owl.ts
 //
 // Renders the Athena owl as dot-density stipple art on braille cells (each
 // terminal cell is a 2x4 dot grid): the perched masthead owl — ear tufts, a
