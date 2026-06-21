@@ -1,4 +1,4 @@
-// The voice of the command room (docs/ui-identity-design.md): the working-verb
+// The voice of the command room: the working-verb
 // lexicon and the daily maxim. Flavor lives in spinners, summaries, and
 // empty-states only — never in command names or error paths. Pure helpers so
 // tests can pin the rotation behavior.

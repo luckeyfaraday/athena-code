@@ -1,5 +1,5 @@
 // The working verb — one muted word at the right of the session prompt while
-// a turn is running (docs/ui-identity-design.md). The upstream spinner
+// a turn is running. The upstream spinner
 // already animates; this adds the voice. Rotates slowly so a long turn reads
 // as alive, seeded per session so parallel panes don't move in lockstep.
 

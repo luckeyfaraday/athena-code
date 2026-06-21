@@ -1,5 +1,5 @@
-// The Athena owl — braille stipple art, the masthead and the logo
-// (docs/ui-identity-design.md). One bird at one scale everywhere: perched it
+// The Athena owl — braille stipple art, the masthead and the logo.
+// One bird at one scale everywhere: perched it
 // rests with crescent eyes and on a rare randomized timer glances up at you;
 // at startup the same owl swoops in from the top-left as the flight sprite,
 // lands, glances, and settles. The face row renders one step brighter than
