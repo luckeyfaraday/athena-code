@@ -211,6 +211,21 @@ so it can manage memory, search history, and coordinate other local agents:
 Inside the terminal UI, the `/find-sessions` command opens the cross-agent
 session search dialog backed by the local session index.
 
+### Multi-agent workflows
+
+Athena Code can search, resume, and delegate across the coding agents already
+on your machine:
+
+1. **Recall** — `session_recall` or `/find-sessions` searches indexed sessions
+   from every local agent.
+2. **Take over** — `session_takeover` resumes a past session in this terminal;
+   `agent_takeover` does the same for a live spawn.
+3. **Delegate** — `agent_spawn` hands a subtask to Claude Code, Codex,
+   opencode, or Hermes; `agent_wait` returns the result.
+
+Example: *"Find where we fixed JWT refresh in Claude last week, pick it up
+here, then have Codex write tests for it."*
+
 ### Permissions
 
 By default Athena Code runs permissionless: tool-call permission prompts are
