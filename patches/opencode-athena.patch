@@ -1,9 +1,9 @@
 diff --git a/packages/opencode/src/cli/tui/worker.ts b/packages/opencode/src/cli/tui/worker.ts
-index 31ead18..79e4065 100644
+index 9f33cd5b934b3ccd96726acafc900e4fdfe2c99a..10afa62454343a95a46e24703f627f6be044df73 100644
 --- a/packages/opencode/src/cli/tui/worker.ts
 +++ b/packages/opencode/src/cli/tui/worker.ts
-@@ -3,7 +3,7 @@ import { Server } from "@/server/server"
- import * as Log from "@opencode-ai/core/util/log"
+@@ -1,7 +1,7 @@
+ import { Server } from "@/server/server"
  import { InstanceRuntime } from "@/project/instance-runtime"
  import { Rpc } from "@/util/rpc"
 -import { upgrade } from "@/cli/upgrade"
@@ -12,10 +12,10 @@ index 31ead18..79e4065 100644
  import { GlobalBus } from "@/bus/global"
  import { ServerAuth } from "@/server/auth"
 diff --git a/packages/opencode/src/index.ts b/packages/opencode/src/index.ts
-index 67a64d5..d94709c 100644
+index 13540a73a36fcb27f591011d9147c60073055b45..e14df4dc431d389fa1881820083805d6ca1d6a60 100644
 --- a/packages/opencode/src/index.ts
 +++ b/packages/opencode/src/index.ts
-@@ -6,7 +6,7 @@ import * as Log from "@opencode-ai/core/util/log"
+@@ -5,7 +5,7 @@ import { GenerateCommand } from "./cli/cmd/generate"
  import { ConsoleCommand } from "./cli/cmd/account"
  import { ProvidersCommand } from "./cli/cmd/providers"
  import { AgentCommand } from "./cli/cmd/agent"
@@ -24,7 +24,7 @@ index 67a64d5..d94709c 100644
  import { UninstallCommand } from "./cli/cmd/uninstall"
  import { ModelsCommand } from "./cli/cmd/models"
  import { UI } from "./cli/ui"
-@@ -29,6 +29,7 @@ import { WebCommand } from "./cli/cmd/web"
+@@ -26,6 +26,7 @@ import { WebCommand } from "./cli/cmd/web"
  import { PrCommand } from "./cli/cmd/pr"
  import { SessionCommand } from "./cli/cmd/session"
  import { DbCommand } from "./cli/cmd/db"
@@ -32,7 +32,7 @@ index 67a64d5..d94709c 100644
  import { errorMessage } from "./util/error"
  import { PluginCommand } from "./cli/cmd/plug"
  import { Heap } from "./cli/heap"
-@@ -135,6 +136,7 @@ const cli = yargs(args)
+@@ -101,6 +102,7 @@ const cli = yargs(args)
    .command(SessionCommand)
    .command(PluginCommand)
    .command(DbCommand)
@@ -41,18 +41,18 @@ index 67a64d5..d94709c 100644
      if (
        msg?.startsWith("Unknown argument") ||
 diff --git a/packages/opencode/src/installation/index.ts b/packages/opencode/src/installation/index.ts
-index d2a2ffb..fbbf79e 100644
+index 0ed10dc327ddb0eeddec38a3e74bf7c75a04cffd..6868dd5172e6fa0bc419d97cc0581169a366c071 100644
 --- a/packages/opencode/src/installation/index.ts
 +++ b/packages/opencode/src/installation/index.ts
-@@ -12,6 +12,7 @@ import { makeRuntime } from "@opencode-ai/core/effect/runtime"
+@@ -13,6 +13,7 @@ import { makeRuntime } from "@opencode-ai/core/effect/runtime"
  import semver from "semver"
  import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
  import { NpmConfig } from "@opencode-ai/core/npm-config"
 +import { makeAthenaInstallationLayer } from "./athena"
  
- const log = Log.create({ service: "installation" })
+ export type Method = "curl" | "npm" | "yarn" | "pnpm" | "bun" | "brew" | "scoop" | "choco" | "unknown"
  
-@@ -338,7 +339,10 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProce
+@@ -337,7 +338,10 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProce
    }),
  )
  
@@ -65,27 +65,27 @@ index d2a2ffb..fbbf79e 100644
  const { runPromise } = makeRuntime(Service, defaultLayer)
  
 diff --git a/packages/opencode/src/plugin/index.ts b/packages/opencode/src/plugin/index.ts
-index 4781142..0b27a34 100644
+index 0f71b39a9d5e89e951d293432aad95ecfa368947..e496b23d1252b745a3252fe7b0f2b63b2d0fc054 100644
 --- a/packages/opencode/src/plugin/index.ts
 +++ b/packages/opencode/src/plugin/index.ts
-@@ -19,6 +19,7 @@ import { CloudflareAIGatewayAuthPlugin, CloudflareWorkersAuthPlugin } from "./cl
- import { AzureAuthPlugin } from "./azure"
+@@ -20,6 +20,7 @@ import { AzureAuthPlugin } from "./azure"
  import { DigitalOceanAuthPlugin } from "./digitalocean"
  import { XaiAuthPlugin } from "./xai"
+ import { SnowflakeCortexAuthPlugin } from "./snowflake-cortex"
 +import { AthenaPlugin } from "./athena"
  import { Effect, Layer, Context } from "effect"
  import { EffectBridge } from "@/effect/bridge"
  import { InstanceState } from "@/effect/instance-state"
 @@ -78,6 +79,7 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
-     AzureAuthPlugin,
      DigitalOceanAuthPlugin,
+     SnowflakeCortexAuthPlugin,
      XaiAuthPlugin,
 +    AthenaPlugin,
    ]
  }
  
 diff --git a/packages/opencode/src/temporary.ts b/packages/opencode/src/temporary.ts
-index e7abd0d..481436b 100644
+index 95461f301b5cf4929458c72b4fb0458942ac4b17..dae2f7528a377a3b0b6eb1494e8a2ff5b6b3d91d 100644
 --- a/packages/opencode/src/temporary.ts
 +++ b/packages/opencode/src/temporary.ts
 @@ -1,5 +1,6 @@
@@ -94,15 +94,15 @@ index e7abd0d..481436b 100644
 +import { MemoryCommand } from "./cli/cmd/memory"
  import { InstallationVersion } from "@opencode-ai/core/installation/version"
  import { hideBin } from "yargs/helpers"
- import { Log } from "./node"
-@@ -30,4 +31,5 @@ const cli = yargs(hideBin(process.argv))
-     type: "boolean",
+ const cli = yargs(hideBin(process.argv))
+@@ -28,4 +29,5 @@ const cli = yargs(hideBin(process.argv))
+     if (opts.logLevel) process.env.OPENCODE_LOG_LEVEL = opts.logLevel
    })
    .command(TuiThreadCommand)
 +  .command(MemoryCommand)
    .parse()
 diff --git a/packages/tui/src/app.tsx b/packages/tui/src/app.tsx
-index ec1fe4d..c7eb727 100644
+index 17a9a554c2e4e6241414285f294867533b7055d0..2679eb6b8d2e0be75b719bd3f8aa28ee24785db0 100644
 --- a/packages/tui/src/app.tsx
 +++ b/packages/tui/src/app.tsx
 @@ -4,6 +4,7 @@ import { Deferred, Effect } from "effect"
@@ -111,9 +111,9 @@ index ec1fe4d..c7eb727 100644
  import { InstallationVersion } from "@opencode-ai/core/installation/version"
 +import { athenaRuntimeBrand, athenaTerminalPrefix } from "./branding"
  import { ClipboardProvider, useClipboard } from "./context/clipboard"
+ import { ExitProvider, useExit } from "./context/exit"
  import { EpilogueProvider } from "./context/epilogue"
- import * as Selection from "./util/selection"
-@@ -420,24 +421,24 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
+@@ -440,24 +441,24 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
      if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
  
      if (route.data.type === "home") {
@@ -142,7 +142,7 @@ index ec1fe4d..c7eb727 100644
      }
    })
  
-@@ -1017,7 +1018,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
+@@ -1037,7 +1038,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
      await DialogAlert.show(
        dialog,
        "Update Complete",
@@ -150,9 +150,9 @@ index ec1fe4d..c7eb727 100644
 +      `Successfully updated to Athena Code v${result.data.version}. Please restart the application.`,
      )
  
-     destroyRenderer(renderer)
+     void exit()
 diff --git a/packages/tui/src/attention.ts b/packages/tui/src/attention.ts
-index b309edc..4751cae 100644
+index b309edcd9dd95c9d267cc78ba13960e95a178b46..4751cae9c37754cb424b7f5daf2f503c00d5b2a3 100644
 --- a/packages/tui/src/attention.ts
 +++ b/packages/tui/src/attention.ts
 @@ -38,14 +38,14 @@ type TuiAttentionHost = TuiAttention & {
@@ -173,7 +173,7 @@ index b309edc..4751cae 100644
    sounds: {
      default: defaultSoundPath,
 diff --git a/packages/tui/src/component/dialog-provider.tsx b/packages/tui/src/component/dialog-provider.tsx
-index 2767508..9aef9c5 100644
+index 2767508eb2d24dbe813fc4aebc7ea0f451144ad8..9aef9c5f13a9bbfb8c36c6dd75505c99b556f6cb 100644
 --- a/packages/tui/src/component/dialog-provider.tsx
 +++ b/packages/tui/src/component/dialog-provider.tsx
 @@ -294,12 +294,14 @@ function AutoMethod(props: AutoMethodProps) {
@@ -205,7 +205,7 @@ index 2767508..9aef9c5 100644
              <text fg={theme.error}>Invalid code</text>
            </Show>
 diff --git a/packages/tui/src/component/prompt/autocomplete.tsx b/packages/tui/src/component/prompt/autocomplete.tsx
-index 4221f6f..40dfef2 100644
+index f2916173da3a507dbafdb614090cb71ea27c3c93..1701d935d0a5509f587bd9d820f205a060cbd657 100644
 --- a/packages/tui/src/component/prompt/autocomplete.tsx
 +++ b/packages/tui/src/component/prompt/autocomplete.tsx
 @@ -1,4 +1,5 @@
@@ -214,7 +214,7 @@ index 4221f6f..40dfef2 100644
  import { pathToFileURL } from "bun"
  import fuzzysort from "fuzzysort"
  import path from "path"
-@@ -12,8 +13,7 @@ import { useSync } from "../../context/sync"
+@@ -13,8 +14,7 @@ import { useData } from "../../context/data"
  import { getScrollAcceleration } from "../../util/scroll"
  import { useTuiPaths } from "../../context/runtime"
  import { useTuiConfig } from "../../config"
@@ -224,7 +224,7 @@ index 4221f6f..40dfef2 100644
  import { useTerminalDimensions } from "@opentui/solid"
  import { Locale } from "../../util/locale"
  import type { PromptInfo } from "../../prompt/history"
-@@ -747,12 +747,10 @@ export function Autocomplete(props: {
+@@ -716,12 +716,10 @@ export function Autocomplete(props: {
        left={position().x}
        width={position().width}
        zIndex={100}
@@ -238,7 +238,7 @@ index 4221f6f..40dfef2 100644
          height={height()}
          scrollbarOptions={{ visible: false }}
          scrollAcceleration={scrollAcceleration()}
-@@ -769,7 +767,7 @@ export function Autocomplete(props: {
+@@ -738,7 +736,7 @@ export function Autocomplete(props: {
              <box
                paddingLeft={1}
                paddingRight={1}
@@ -247,7 +247,7 @@ index 4221f6f..40dfef2 100644
                flexDirection="row"
                onMouseMove={() => {
                  setStore("input", "mouse")
-@@ -784,11 +782,20 @@ export function Autocomplete(props: {
+@@ -753,11 +751,20 @@ export function Autocomplete(props: {
                }}
                onMouseUp={() => select()}
              >
@@ -271,7 +271,7 @@ index 4221f6f..40dfef2 100644
                  </text>
                </Show>
 diff --git a/packages/tui/src/component/prompt/index.tsx b/packages/tui/src/component/prompt/index.tsx
-index 0a9f103..2d93003 100644
+index aa002080b1ddd8274a9cc5bd93542f6d4a731c10..5a16e34b3de58cab63ed17f520d3e5c84c21ea4d 100644
 --- a/packages/tui/src/component/prompt/index.tsx
 +++ b/packages/tui/src/component/prompt/index.tsx
 @@ -15,8 +15,9 @@ import path from "path"
@@ -294,7 +294,7 @@ index 0a9f103..2d93003 100644
  import { useDialog } from "../../ui/dialog"
  import { DialogProvider as DialogProviderConnect } from "../dialog-provider"
  import { DialogAlert } from "../../ui/dialog-alert"
-@@ -205,7 +206,7 @@ export function Prompt(props: PromptProps) {
+@@ -206,7 +207,7 @@ export function Prompt(props: PromptProps) {
    const workspace = usePromptWorkspace(props.sessionID)
    const move = usePromptMove({ projectID: project.project, sessionID: () => props.sessionID })
    const [cursorVersion, setCursorVersion] = createSignal(0)
@@ -303,7 +303,7 @@ index 0a9f103..2d93003 100644
    const hasRightContent = createMemo(() => Boolean(props.right))
  
    function promptModelWarning() {
-@@ -1309,22 +1310,7 @@ export function Prompt(props: PromptProps) {
+@@ -1319,22 +1320,7 @@ export function Prompt(props: PromptProps) {
          ? (local.agent.list().find((a) => a.name === lastUserMessage()?.agent) ?? local.agent.current())
          : local.agent.current()
      const color = agent ? local.agent.color(agent.name) : theme.border
@@ -327,7 +327,7 @@ index 0a9f103..2d93003 100644
    })
    const maxHeight = createMemo(() => tuiConfig.prompt?.max_height ?? Math.max(6, Math.floor(dimensions().height / 3)))
    const moveLabelWidth = createMemo(() => Math.max(12, Math.min(44, dimensions().width - 48)))
-@@ -1334,22 +1320,25 @@ export function Prompt(props: PromptProps) {
+@@ -1344,22 +1330,25 @@ export function Prompt(props: PromptProps) {
        <box ref={(r: BoxRenderable) => (anchor = r)} visible={props.visible !== false} width="100%">
          <box
            width="100%"
@@ -359,7 +359,7 @@ index 0a9f103..2d93003 100644
              <textarea
                width="100%"
                placeholder={placeholderText()}
-@@ -1419,12 +1408,18 @@ export function Prompt(props: PromptProps) {
+@@ -1429,12 +1418,18 @@ export function Prompt(props: PromptProps) {
                  }, 0)
                }}
                onMouseDown={(r: MouseEvent) => r.target?.focus()}
@@ -379,7 +379,7 @@ index 0a9f103..2d93003 100644
                  <Show when={local.agent.current()} fallback={<box height={1} />}>
                    {(agent) => (
                      <>
-@@ -1469,7 +1464,7 @@ export function Prompt(props: PromptProps) {
+@@ -1479,7 +1474,7 @@ export function Prompt(props: PromptProps) {
            borderColor={borderHighlight()}
            customBorderChars={{
              ...EmptyBorder,
@@ -388,7 +388,7 @@ index 0a9f103..2d93003 100644
            }}
          >
            <box
-@@ -1480,7 +1475,7 @@ export function Prompt(props: PromptProps) {
+@@ -1490,7 +1485,7 @@ export function Prompt(props: PromptProps) {
                theme.backgroundElement.a !== 0
                  ? {
                      ...EmptyBorder,
@@ -397,7 +397,7 @@ index 0a9f103..2d93003 100644
                    }
                  : {
                      ...EmptyBorder,
-@@ -1500,8 +1495,8 @@ export function Prompt(props: PromptProps) {
+@@ -1510,8 +1505,8 @@ export function Prompt(props: PromptProps) {
                >
                  <box flexShrink={0} flexDirection="row" gap={1}>
                    <box marginLeft={1}>
@@ -409,7 +409,7 @@ index 0a9f103..2d93003 100644
                    </box>
                    <box flexDirection="row" gap={1} flexShrink={0}>
 diff --git a/packages/tui/src/context/theme.tsx b/packages/tui/src/context/theme.tsx
-index 909dd69..a7182ff 100644
+index 909dd69ac2493cb0554520e25c3a0ecbebad6252..a7182ff7aaa0691b0557650ed50e765a2106dcda 100644
 --- a/packages/tui/src/context/theme.tsx
 +++ b/packages/tui/src/context/theme.tsx
 @@ -93,7 +93,7 @@ const [store, setStore] = createStore<State>({
@@ -469,7 +469,7 @@ index 909dd69..a7182ff 100644
  
      createEffect(() => renderer.setBackgroundColor(values().background))
 diff --git a/packages/tui/src/feature-plugins/builtins.ts b/packages/tui/src/feature-plugins/builtins.ts
-index 46e122d..03f4bdc 100644
+index b67923f3c5d1646826ee66b8b314563beea16714..963feb7165c08690a829cb96c3c1fb5cb4c2f710 100644
 --- a/packages/tui/src/feature-plugins/builtins.ts
 +++ b/packages/tui/src/feature-plugins/builtins.ts
 @@ -1,4 +1,5 @@
@@ -477,17 +477,15 @@ index 46e122d..03f4bdc 100644
 +import Athena from "./athena"
  import HomeFooter from "./home/footer"
  import HomeTips from "./home/tips"
- import SessionSwitcher from "./session"
-@@ -25,6 +26,7 @@ export function createBuiltinPlugins(options: {
-   experimentalSessionSwitcher: boolean
- }): BuiltinTuiPlugin[] {
+ import SidebarContext from "./sidebar/context"
+@@ -22,4 +23,5 @@ export function createBuiltinPlugins(options: { experimentalEventSystem: boolean }): BuiltinTuiPlugin[] {
    return [
 +    Athena,
      HomeFooter,
      HomeTips,
      SidebarContext,
 diff --git a/packages/tui/src/logo.ts b/packages/tui/src/logo.ts
-index a58a8cf..6f40d30 100644
+index a58a8cf995f7850ae86d3a3d7ca2612163680243..6f40d30d0162f8ed50615436aa0c944948d51c26 100644
 --- a/packages/tui/src/logo.ts
 +++ b/packages/tui/src/logo.ts
 @@ -1,6 +1,10 @@
@@ -504,7 +502,7 @@ index a58a8cf..6f40d30 100644
  
  export const go = {
 diff --git a/packages/tui/src/routes/home.tsx b/packages/tui/src/routes/home.tsx
-index d4145e2..c07f54f 100644
+index d4145e2d87be4d36a645e18226824b7bbcf321a6..c07f54fa41811ac2452465318597632347019130 100644
 --- a/packages/tui/src/routes/home.tsx
 +++ b/packages/tui/src/routes/home.tsx
 @@ -15,7 +15,7 @@ import { HomeSessionDestinationProvider } from "./home/session-destination"
@@ -517,7 +515,7 @@ index d4145e2..c07f54f 100644
  }
  
 diff --git a/packages/tui/src/routes/session/index.tsx b/packages/tui/src/routes/session/index.tsx
-index 7736eb7..74b5ce6 100644
+index e3758374c870505311ef1bec603ff9417ff2d0a3..19be836d2f41d48311bedc0629fb7143f27e2b21 100644
 --- a/packages/tui/src/routes/session/index.tsx
 +++ b/packages/tui/src/routes/session/index.tsx
 @@ -1,5 +1,4 @@
@@ -526,7 +524,7 @@ index 7736eb7..74b5ce6 100644
    createContext,
    createEffect,
    createMemo,
-@@ -119,7 +118,6 @@ const sessionBindingCommands = [
+@@ -121,7 +120,6 @@ const sessionBindingCommands = [
    "session.unshare",
    "session.undo",
    "session.redo",
@@ -534,7 +532,7 @@ index 7736eb7..74b5ce6 100644
    "session.toggle.conceal",
    "session.toggle.timestamps",
    "session.toggle.thinking",
-@@ -246,8 +244,6 @@ export function Session() {
+@@ -241,8 +239,6 @@ export function Session() {
    })
  
    const dimensions = useTerminalDimensions()
@@ -543,7 +541,7 @@ index 7736eb7..74b5ce6 100644
    const [conceal, setConceal] = createSignal(true)
    const thinking = useThinkingMode()
    const thinkingMode = thinking.mode
-@@ -261,12 +257,8 @@ export function Session() {
+@@ -256,12 +252,8 @@ export function Session() {
    const [showGenericToolOutput, setShowGenericToolOutput] = kv.signal("generic_tool_output_visibility", false)
  
    const wide = createMemo(() => dimensions().width > 120)
@@ -558,7 +556,7 @@ index 7736eb7..74b5ce6 100644
    const showTimestamps = createMemo(() => timestamps() === "show")
    const contentWidth = createMemo(() => dimensions().width - (sidebarVisible() ? 42 : 0) - 4)
    const providers = createMemo(() => Model.index(sync.data.provider))
-@@ -663,19 +655,6 @@ export function Session() {
+@@ -658,19 +650,6 @@ export function Session() {
          })
        },
      },
@@ -578,10 +576,10 @@ index 7736eb7..74b5ce6 100644
      {
        title: conceal() ? "Disable code concealment" : "Enable code concealment",
        value: "session.toggle.conceal",
-@@ -1393,25 +1372,23 @@ function UserMessage(props: {
-       <Show when={text()}>
+@@ -1388,25 +1367,23 @@ function UserMessage(props: {
          <box
            id={props.message.id}
+           ref={(el: BoxRenderable) => alwaysSeparate.add(el)}
 -          border={["left"]}
 -          borderColor={color()}
 -          customBorderChars={SplitBorder.customBorderChars}
@@ -619,7 +617,7 @@ index 7736eb7..74b5ce6 100644
              <text fg={theme.text}>{text()}</text>
              <Show when={files().length}>
                <box flexDirection="row" paddingBottom={metadataVisible() ? 1 : 0} paddingTop={1} gap={1} flexWrap="wrap">
-@@ -1470,7 +1447,6 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
+@@ -1465,7 +1442,6 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
    const { theme } = useTheme()
    const sync = useSync()
    const messages = createMemo(() => sync.data.message[props.message.sessionID] ?? [])
@@ -627,16 +625,16 @@ index 7736eb7..74b5ce6 100644
  
    const final = createMemo(() => {
      return props.message.finish && !["tool-calls", "unknown"].includes(props.message.finish)
-@@ -1541,7 +1517,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
+@@ -1540,7 +1516,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
        </Show>
        <Switch>
          <Match when={props.last || final() || props.message.error?.name === "MessageAbortedError"}>
--          <box paddingLeft={3}>
-+          <box paddingLeft={1}>
+-          <box ref={(el: BoxRenderable) => alwaysSeparate.add(el)} paddingLeft={3}>
++          <box ref={(el: BoxRenderable) => alwaysSeparate.add(el)} paddingLeft={1}>
              <text marginTop={1}>
                <span
                  style={{
-@@ -1551,15 +1527,16 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
+@@ -1550,15 +1526,16 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                        : local.agent.color(props.message.agent),
                  }}
                >
@@ -659,7 +657,7 @@ index 7736eb7..74b5ce6 100644
                </Show>
              </text>
            </box>
-@@ -1657,7 +1634,7 @@ function ReasoningHeader(props: {
+@@ -1662,7 +1639,7 @@ function ReasoningHeader(props: {
        <Match when={true}>
          <text fg={fg()} wrapMode="none">
            <Show when={props.toggleable}>
@@ -668,7 +666,7 @@ index 7736eb7..74b5ce6 100644
            </Show>
            <span>Thought</span>
            <Show when={props.title || props.duration}>
-@@ -1681,6 +1658,8 @@ function ReasoningHeader(props: {
+@@ -1686,6 +1663,8 @@ function ReasoningHeader(props: {
  function TextPart(props: { last: boolean; part: TextPart; message: AssistantMessage }) {
    const ctx = use()
    const { theme, syntax } = useTheme()
@@ -676,7 +674,7 @@ index 7736eb7..74b5ce6 100644
 +  // header — no gutter glyph, no bubble, just the prose as a command-log block.
    return (
      <Show when={props.part.text.trim()}>
-       <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
+       <box ref={(el: BoxRenderable) => alwaysSeparate.add(el)} paddingLeft={3} marginTop={1} flexShrink={0}>
 @@ -1955,18 +1934,22 @@ export function InlineToolRow(props: {
                  fg={props.color}
                  attributes={props.denied ? TextAttributes.STRIKETHROUGH : undefined}
@@ -685,7 +683,7 @@ index 7736eb7..74b5ce6 100644
 +                ╌ {props.pending}
                </text>
              }
-             when={props.complete}
+             when={props.complete || props.failed}
            >
              <box flexDirection="row">
 +              {/* Athena terminal-log: every completed tool row opens with the ╌
@@ -703,7 +701,7 @@ index 7736eb7..74b5ce6 100644
                <text
                  flexGrow={1}
 diff --git a/packages/tui/src/routes/session/permission.tsx b/packages/tui/src/routes/session/permission.tsx
-index c787a84..7962e78 100644
+index c787a84a85946af2aa4e8fec264223c55ddc66e4..7962e78aa8bc5f8db37abee2cb66217ee3f9a74c 100644
 --- a/packages/tui/src/routes/session/permission.tsx
 +++ b/packages/tui/src/routes/session/permission.tsx
 @@ -141,11 +141,11 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
@@ -730,7 +728,7 @@ index c787a84..7962e78 100644
        </box>
        <box
 diff --git a/packages/tui/src/theme/index.ts b/packages/tui/src/theme/index.ts
-index e8a5f2c..d530efd 100644
+index e8a5f2c5a97384f95219a9e95d5d491beeb294ec..d530efd29d8b00188a5d9b4492890e0f88edb5ba 100644
 --- a/packages/tui/src/theme/index.ts
 +++ b/packages/tui/src/theme/index.ts
 @@ -1,37 +1,9 @@
@@ -822,7 +820,7 @@ index e8a5f2c..d530efd 100644
  
  const pluginThemes: Record<string, ThemeJson> = {}
 diff --git a/packages/tui/src/ui/dialog.tsx b/packages/tui/src/ui/dialog.tsx
-index b6cd705..c5fcddb 100644
+index b6cd705b1e84572cedab77d8a3aa3f8f168493a5..c5fcddb8207ecd46b84445010ec971f692e37643 100644
 --- a/packages/tui/src/ui/dialog.tsx
 +++ b/packages/tui/src/ui/dialog.tsx
 @@ -11,6 +11,12 @@ import { useClipboard } from "../context/clipboard"
@@ -920,7 +918,7 @@ index b6cd705..c5fcddb 100644
            </Dialog>
          </Show>
 diff --git a/packages/tui/src/ui/link.tsx b/packages/tui/src/ui/link.tsx
-index cfd78bc..7729823 100644
+index cfd78bc3335c55cc7e2175b0dbe4bf27798a1bfe..77298239d2a6c9193b6e5cfe7fb9b67ddd5eada5 100644
 --- a/packages/tui/src/ui/link.tsx
 +++ b/packages/tui/src/ui/link.tsx
 @@ -9,11 +9,17 @@ export interface LinkProps {
@@ -950,7 +948,7 @@ index cfd78bc..7729823 100644
          open(props.href).catch(() => {})
        }}
 diff --git a/packages/tui/src/util/presentation.ts b/packages/tui/src/util/presentation.ts
-index cf432bf..aad5a4f 100644
+index cf432bf967ebbd47300596943108d74be84cae0d..aad5a4fef3f426c69abeb7e9503168b6be6e7304 100644
 --- a/packages/tui/src/util/presentation.ts
 +++ b/packages/tui/src/util/presentation.ts
 @@ -1,6 +1,7 @@
