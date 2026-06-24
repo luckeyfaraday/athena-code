@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE="${ATHENA_OPENCODE_SOURCE:-/tmp/athena-opencode-source}"
-REVISION="1772e8ee6e794d1241dac6fa10d28e708f53b881"
+REVISION="4ecc3ac6535316c481982c169ad943ceae91a44e"
 VERSION="${ATHENA_CODE_VERSION:-0.0.0-dev}"
 HOST_PLATFORM="$(node -p 'process.platform')"
 HOST_ARCH="$(node -p 'process.arch')"
