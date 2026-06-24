@@ -186,9 +186,6 @@ Athena Code tells the model to treat recalled text as background data rather
 than as newer instructions. Do not store passwords, API keys, private keys, or
 other secrets in agent memory.
 
-For the design rationale, see
-[Athena Turn-Ownership Memory Design](docs/athena-turn-ownership-design.md).
-
 ## Agent Tools
 
 Beyond the memory layer, Athena Code exposes a set of native tools to the model
