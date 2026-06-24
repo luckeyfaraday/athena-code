@@ -31,7 +31,6 @@ Canonical repository: https://github.com/luckeyfaraday/athena-code
 - Overview and installation: https://github.com/luckeyfaraday/athena-code/blob/main/README.md
 - Development guide: https://github.com/luckeyfaraday/athena-code/blob/main/CONTRIBUTING.md
 - Security policy: https://github.com/luckeyfaraday/athena-code/blob/main/SECURITY.md
-- Memory design: https://github.com/luckeyfaraday/athena-code/blob/main/docs/athena-turn-ownership-design.md
 - Upstream attribution: https://github.com/luckeyfaraday/athena-code/blob/main/THIRD_PARTY_NOTICES.md
 - Releases and checksums: https://github.com/luckeyfaraday/athena-code/releases
 
